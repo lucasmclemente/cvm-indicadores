@@ -1,0 +1,250 @@
+# =============================================================================
+# Dicionario de indicadores.
+#
+# Cada indicador e declarado como uma razao explicita num / den. Isso permite
+# calcular duas visoes setoriais diferentes a partir da mesma definicao:
+#   - mediana / quartis das razoes individuais das empresas
+#   - razao agregada do setor  =  soma(num) / soma(den)   (equivale a ponderar
+#     pelo tamanho: o setor visto como se fosse uma unica companhia)
+#
+# Expressoes sao avaliadas sobre conceitos canonicos (config/conceitos.yaml).
+# Funcoes disponiveis: MED(conceito) -> media entre saldo inicial e final do
+# exercicio, ABS(x), MAX(a,b), MIN(a,b).
+#
+# familias: quais tipos de empresa recebem o indicador. Liquidez corrente nao
+# existe para banco porque o balanco bancario nao segrega circulante.
+# =============================================================================
+
+indicadores:
+
+  # ------------------------------- LIQUIDEZ ----------------------------------
+  liquidez_corrente:
+    rotulo: "Liquidez corrente"
+    grupo: Liquidez
+    familias: [nao_financeira]
+    formato: razao
+    num: "ativo_circulante"
+    den: "passivo_circulante"
+    interpretacao: "Ativo circulante para cada R$ 1 de obrigacao de curto prazo."
+
+  liquidez_seca:
+    rotulo: "Liquidez seca"
+    grupo: Liquidez
+    familias: [nao_financeira]
+    formato: razao
+    num: "ativo_circulante - estoques"
+    den: "passivo_circulante"
+    interpretacao: "Liquidez corrente excluindo estoques (item menos liquido)."
+
+  liquidez_imediata:
+    rotulo: "Liquidez imediata"
+    grupo: Liquidez
+    familias: [nao_financeira]
+    formato: razao
+    num: "caixa + aplicacoes_financeiras"
+    den: "passivo_circulante"
+    interpretacao: "Caixa e aplicacoes frente as obrigacoes de curto prazo."
+
+  capital_giro_liquido:
+    rotulo: "Capital de giro liquido (R$)"
+    grupo: Liquidez
+    familias: [nao_financeira]
+    formato: moeda
+    num: "ativo_circulante - passivo_circulante"
+    den: "1"
+    agregacao_soma: true
+    interpretacao: "Folga absoluta entre ativo e passivo de curto prazo."
+
+  # ------------------------------- MARGENS -----------------------------------
+  margem_bruta:
+    rotulo: "Margem bruta"
+    grupo: Margens
+    familias: [nao_financeira]
+    formato: percentual
+    num: "lucro_bruto"
+    den: "receita_liquida"
+    interpretacao: "Quanto sobra da receita apos o custo direto."
+
+  margem_ebit:
+    rotulo: "Margem EBIT"
+    grupo: Margens
+    familias: [nao_financeira]
+    formato: percentual
+    num: "ebit"
+    den: "receita_liquida"
+    interpretacao: "Rentabilidade operacional antes de juros e impostos."
+
+  margem_ebitda:
+    rotulo: "Margem EBITDA (estimada)"
+    grupo: Margens
+    familias: [nao_financeira]
+    formato: percentual
+    num: "ebit + depreciacao_amortizacao"
+    den: "receita_liquida"
+    requer: [depreciacao_amortizacao]
+    interpretacao: "Margem operacional excluindo depreciacao e amortizacao. D&A extraida da DFC por heuristica."
+
+  margem_liquida:
+    rotulo: "Margem liquida"
+    grupo: Margens
+    familias: [nao_financeira, financeira]
+    formato: percentual
+    num: "lucro_liquido"
+    den: "receita_liquida"
+    interpretacao: "Lucro final sobre receita. Para bancos, sobre receitas de intermediacao."
+
+  margem_intermediacao:
+    rotulo: "Margem de intermediacao financeira"
+    grupo: Margens
+    familias: [financeira]
+    formato: percentual
+    num: "lucro_bruto"
+    den: "receita_liquida"
+    interpretacao: "Resultado bruto de intermediacao sobre receitas de intermediacao."
+
+  # --------------------------- ENDIVIDAMENTO ---------------------------------
+  divida_bruta:
+    rotulo: "Divida bruta (R$)"
+    grupo: Endividamento
+    familias: [nao_financeira]
+    formato: moeda
+    num: "emprestimos_cp + emprestimos_lp"
+    den: "1"
+    agregacao_soma: true
+    interpretacao: "Emprestimos e financiamentos de curto e longo prazo."
+
+  divida_liquida:
+    rotulo: "Divida liquida (R$)"
+    grupo: Endividamento
+    familias: [nao_financeira]
+    formato: moeda
+    num: "emprestimos_cp + emprestimos_lp - caixa - aplicacoes_financeiras"
+    den: "1"
+    agregacao_soma: true
+    interpretacao: "Divida bruta menos caixa e aplicacoes financeiras."
+
+  divida_liquida_ebitda:
+    rotulo: "Divida liquida / EBITDA"
+    grupo: Endividamento
+    familias: [nao_financeira]
+    formato: razao
+    num: "emprestimos_cp + emprestimos_lp - caixa - aplicacoes_financeiras"
+    den: "ebit + depreciacao_amortizacao"
+    requer: [depreciacao_amortizacao]
+    den_positivo: true
+    interpretacao: "Anos de geracao operacional necessarios para quitar a divida liquida."
+
+  endividamento_geral:
+    rotulo: "Endividamento geral"
+    grupo: Endividamento
+    familias: [nao_financeira]
+    formato: percentual
+    num: "passivo_circulante + passivo_nao_circulante"
+    den: "ativo_total"
+    interpretacao: "Parcela do ativo financiada por capital de terceiros."
+
+  divida_bruta_pl:
+    rotulo: "Divida bruta / PL"
+    grupo: Endividamento
+    familias: [nao_financeira]
+    formato: razao
+    num: "emprestimos_cp + emprestimos_lp"
+    den: "patrimonio_liquido"
+    den_positivo: true
+    interpretacao: "Alavancagem financeira sobre o capital proprio."
+
+  composicao_endividamento:
+    rotulo: "Composicao do endividamento (curto prazo)"
+    grupo: Endividamento
+    familias: [nao_financeira]
+    formato: percentual
+    num: "passivo_circulante"
+    den: "passivo_circulante + passivo_nao_circulante"
+    interpretacao: "Parcela das obrigacoes que vence no curto prazo."
+
+  cobertura_juros:
+    rotulo: "Cobertura de juros (aprox.)"
+    grupo: Endividamento
+    familias: [nao_financeira]
+    formato: razao
+    num: "ebit"
+    den: "ABS(resultado_financeiro)"
+    den_positivo: true
+    interpretacao: "EBIT sobre o resultado financeiro liquido. Aproximacao: a DFP nao isola a despesa de juros."
+
+  alavancagem_ativo_pl:
+    rotulo: "Alavancagem (Ativo / PL)"
+    grupo: Endividamento
+    familias: [financeira, nao_financeira]
+    formato: razao
+    num: "ativo_total"
+    den: "patrimonio_liquido"
+    den_positivo: true
+    interpretacao: "Multiplicador de capital proprio. Principal metrica de alavancagem para instituicoes financeiras."
+
+  # -------------------------- RENTABILIDADE ----------------------------------
+  roe:
+    rotulo: "ROE"
+    grupo: Rentabilidade
+    familias: [nao_financeira, financeira]
+    formato: percentual
+    num: "lucro_liquido"
+    den: "MED(patrimonio_liquido)"
+    den_positivo: true
+    interpretacao: "Retorno sobre o patrimonio liquido medio do exercicio."
+
+  roa:
+    rotulo: "ROA"
+    grupo: Rentabilidade
+    familias: [nao_financeira, financeira]
+    formato: percentual
+    num: "lucro_liquido"
+    den: "MED(ativo_total)"
+    den_positivo: true
+    interpretacao: "Retorno sobre o ativo total medio."
+
+  roic:
+    rotulo: "ROIC (estimado)"
+    grupo: Rentabilidade
+    familias: [nao_financeira]
+    formato: percentual
+    num: "ebit * (1 - aliquota_efetiva)"
+    den: "MED(patrimonio_liquido) + MED(emprestimos_cp) + MED(emprestimos_lp)"
+    den_positivo: true
+    interpretacao: "NOPAT sobre capital investido medio. Aliquota efetiva derivada da DRE, limitada a 0-50%, com padrao de 34%."
+
+  giro_ativo:
+    rotulo: "Giro do ativo"
+    grupo: Rentabilidade
+    familias: [nao_financeira]
+    formato: razao
+    num: "receita_liquida"
+    den: "MED(ativo_total)"
+    den_positivo: true
+    interpretacao: "Receita gerada por R$ 1 de ativo medio."
+
+  margem_fco:
+    rotulo: "Conversao de caixa (FCO / EBITDA)"
+    grupo: Rentabilidade
+    familias: [nao_financeira]
+    formato: percentual
+    num: "fco"
+    den: "ebit + depreciacao_amortizacao"
+    requer: [fco, depreciacao_amortizacao]
+    den_positivo: true
+    interpretacao: "Quanto do resultado operacional vira caixa de fato."
+
+# --- Regras de saneamento aplicadas antes da agregacao setorial ---------------
+# Sem isso, uma empresa com PL de R$ 1 mil e lucro de R$ 50 milhoes produz um
+# ROE de 5.000.000% que arrasta qualquer media do setor.
+saneamento:
+  # Descarta a observacao se o denominador for menor que este valor absoluto
+  # em reais (evita razoes explosivas por denominador residual).
+  denominador_minimo_brl: 100000
+  # Limites de plausibilidade por formato. Valores fora viram nulo e sao
+  # contabilizados como descarte na aba de qualidade.
+  limites:
+    percentual: [-10.0, 10.0]     # -1000% a +1000%
+    razao:      [-100.0, 100.0]
+  # Alerta quando o setor/ano tem menos empresas que isto.
+  n_minimo_setor: 5

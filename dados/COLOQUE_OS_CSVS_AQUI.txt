@@ -1,0 +1,2 @@
+Coloque aqui os arquivos da CVM (CSV ou o ZIP anual completo) e aponte
+o caminho "./dados" na barra lateral do aplicativo.

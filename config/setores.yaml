@@ -1,0 +1,38 @@
+# =============================================================================
+# Normalizacao de setores.
+#
+# O campo Setor_Atividade da base cadastral tem 53 valores, dos quais 21 sao
+# espelhos "Emp. Adm. Part. - X" (holdings do setor X). Sem consolidar,
+# "Energia Eletrica" (78 empresas) e "Emp. Adm. Part. - Energia Eletrica" (27)
+# viram dois setores distintos e ambos ficam com amostra menor.
+# =============================================================================
+
+# Prefixo de holding removido antes de qualquer outra regra.
+prefixo_holding: "Emp. Adm. Part. - "
+
+# O setor sem correspondente operacional vira categoria propria.
+setor_holding_pura: "Emp. Adm. Part. - Sem Setor Principal"
+rotulo_holding_pura: "Holdings Diversificadas"
+
+# Apos remover o prefixo, as abreviacoes usadas nos rotulos de holding nao
+# batem com os rotulos operacionais. Este mapa reconcilia os dois.
+aliases:
+  "Const. Civil, Mat. Const. e Decoração": "Construção Civil, Mat. Constr. e Decoração"
+  "Máqs., Equip., Veíc. e Peças": "Máquinas, Equipamentos, Veículos e Peças"
+  "Serv. Transporte e Logística": "Serviços Transporte e Logística"
+  "Saneamento, Serv. Água e Gás": "Saneamento, Serv. Água e Gás"
+  "Crédito Imobiliário": "Intermediação Financeira"
+
+# Setores tratados como financeiros mesmo quando a companhia usa o plano de
+# contas padrao. Nesses casos liquidez e margens existem tecnicamente, mas nao
+# sao comparaveis com a industria.
+setores_financeiros:
+  - "Bancos"
+  - "Intermediação Financeira"
+  - "Seguradoras e Corretoras"
+  - "Arrendamento Mercantil"
+  - "Securitização de Recebíveis"
+  - "Bolsas de Valores/Mercadorias e Futuros"
+
+# Rotulo aplicado a companhias presentes nas DFs mas ausentes do cadastro.
+setor_desconhecido: "Sem classificação cadastral"

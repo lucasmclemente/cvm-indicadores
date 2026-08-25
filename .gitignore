@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Dados brutos da CVM (grandes, baixados localmente)
+dados/*.csv
+dados/*.zip
+dados/*.xlsx
+!dados/COLOQUE_OS_CSVS_AQUI.txt
+
+# Streamlit / SO
+.streamlit/secrets.toml
+.DS_Store
+Thumbs.db

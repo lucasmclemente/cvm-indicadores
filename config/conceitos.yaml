@@ -1,0 +1,190 @@
+# =============================================================================
+# Mapeamento CD_CONTA -> conceito canonico, por plano de contas da CVM.
+#
+# Por que este arquivo existe:
+#   O codigo da conta NAO tem significado unico nos arquivos DFP. A conta 2.03
+#   e "Patrimonio Liquido" para uma industria, "Provisoes" para um banco e
+#   "Passivos Financeiros ao Custo Amortizado" para uma seguradora. Sem esta
+#   camada, qualquer calculo de indicador mistura conceitos diferentes.
+#
+# Como a resolucao funciona (core/conceitos.py):
+#   1. Filtra apenas contas padronizadas (ST_CONTA_FIXA = 'S').
+#   2. Seleciona as linhas cujo CD_CONTA esta em `codigos` do plano detectado.
+#   3. Se `regex` estiver definido, exige tambem que DS_CONTA case com ele.
+#      O regex e a trava de seguranca: se a CVM remanejar o codigo em um layout
+#      futuro, a linha errada e descartada em vez de entrar silenciosamente.
+# =============================================================================
+
+# --- Deteccao do plano de contas ---------------------------------------------
+# Avaliada na ordem abaixo; a primeira que casar vence.
+planos:
+  padrao:
+    rotulo: "Plano padrao (nao-financeiras)"
+    familia: nao_financeira
+    deteccao:
+      demonstracao: BPA
+      codigo: "1.01"
+      regex: "^Ativo Circulante$"
+  banco:
+    rotulo: "Plano de instituicoes financeiras"
+    familia: financeira
+    deteccao:
+      demonstracao: BPP
+      codigo: "2.07"
+      regex: "Patrim.nio L.quido"
+  seguradora:
+    rotulo: "Plano de seguradoras"
+    familia: financeira
+    deteccao:
+      demonstracao: BPP
+      codigo: "2.08"
+      regex: "Patrim.nio L.quido"
+
+# --- Conceitos canonicos ------------------------------------------------------
+conceitos:
+
+  # ---- Ativo ----
+  ativo_total:
+    rotulo: "Ativo total"
+    padrao:     {codigos: ["1"], regex: "^Ativo Total$"}
+    banco:      {codigos: ["1"], regex: "^Ativo Total$"}
+    seguradora: {codigos: ["1"], regex: "^Ativo Total$"}
+
+  ativo_circulante:
+    rotulo: "Ativo circulante"
+    padrao: {codigos: ["1.01"], regex: "^Ativo Circulante$"}
+
+  caixa:
+    rotulo: "Caixa e equivalentes"
+    padrao:     {codigos: ["1.01.01"], regex: "Caixa e Equivalentes"}
+    banco:      {codigos: ["1.01"],    regex: "Caixa e Equivalentes"}
+    seguradora: {codigos: ["1.01"],    regex: "Caixa e Equivalentes"}
+
+  aplicacoes_financeiras:
+    rotulo: "Aplicacoes financeiras (circulante)"
+    padrao: {codigos: ["1.01.02"], regex: "Aplica..es Financeiras"}
+
+  contas_receber:
+    rotulo: "Contas a receber (circulante)"
+    padrao: {codigos: ["1.01.03"], regex: "^Contas a Receber$"}
+
+  estoques:
+    rotulo: "Estoques"
+    padrao: {codigos: ["1.01.04"], regex: "^Estoques$"}
+
+  ativo_nao_circulante:
+    rotulo: "Ativo nao circulante"
+    padrao: {codigos: ["1.02"], regex: "^Ativo N.o Circulante$"}
+
+  imobilizado:
+    rotulo: "Imobilizado"
+    padrao:     {codigos: ["1.02.03"], regex: "^Imobilizado$"}
+    banco:      {codigos: ["1.06"],    regex: "^Imobilizado$"}
+    seguradora: {codigos: ["1.06", "1.07"], regex: "^Imobilizado$"}
+
+  # ---- Passivo e patrimonio ----
+  passivo_total:
+    rotulo: "Passivo total"
+    padrao:     {codigos: ["2"], regex: "^Passivo Total$"}
+    banco:      {codigos: ["2"], regex: "^Passivo Total$"}
+    seguradora: {codigos: ["2"], regex: "^Passivo Total$"}
+
+  passivo_circulante:
+    rotulo: "Passivo circulante"
+    padrao: {codigos: ["2.01"], regex: "^Passivo Circulante$"}
+
+  passivo_nao_circulante:
+    rotulo: "Passivo nao circulante"
+    padrao: {codigos: ["2.02"], regex: "^Passivo N.o Circulante$"}
+
+  emprestimos_cp:
+    rotulo: "Emprestimos e financiamentos (curto prazo)"
+    padrao: {codigos: ["2.01.04"], regex: "Empr.stimos e Financiamentos"}
+
+  emprestimos_lp:
+    rotulo: "Emprestimos e financiamentos (longo prazo)"
+    padrao: {codigos: ["2.02.01"], regex: "Empr.stimos e Financiamentos"}
+
+  patrimonio_liquido:
+    rotulo: "Patrimonio liquido consolidado"
+    padrao:     {codigos: ["2.03"], regex: "Patrim.nio L.quido"}
+    banco:      {codigos: ["2.07"], regex: "Patrim.nio L.quido"}
+    seguradora: {codigos: ["2.08"], regex: "Patrim.nio L.quido"}
+
+  participacao_nao_controladores:
+    rotulo: "Participacao de nao controladores"
+    padrao:     {codigos: ["2.03.09"], regex: "N.o Controladores"}
+    banco:      {codigos: ["2.07.09"], regex: "N.o Controladores"}
+    seguradora: {codigos: ["2.08.09"], regex: "N.o Controladores"}
+
+  # ---- Resultado ----
+  receita_liquida:
+    rotulo: "Receita liquida"
+    padrao:     {codigos: ["3.01"], regex: "Receita de Venda"}
+    banco:      {codigos: ["3.01"], regex: "Receitas de Intermedia..o"}
+    seguradora: {codigos: ["3.01"]}
+
+  custo:
+    rotulo: "Custo dos bens e servicos vendidos"
+    padrao: {codigos: ["3.02"], regex: "Custo dos Bens"}
+
+  lucro_bruto:
+    rotulo: "Resultado bruto"
+    padrao:     {codigos: ["3.03"], regex: "^Resultado Bruto$"}
+    banco:      {codigos: ["3.03"], regex: "Resultado Bruto"}
+    seguradora: {codigos: ["3.03"], regex: "Resultado Bruto"}
+
+  ebit:
+    rotulo: "EBIT (result. antes do financeiro e tributos)"
+    padrao: {codigos: ["3.05"], regex: "Antes do Resultado Financeiro"}
+
+  resultado_financeiro:
+    rotulo: "Resultado financeiro"
+    padrao: {codigos: ["3.06"], regex: "^Resultado Financeiro$"}
+
+  ebt:
+    rotulo: "Resultado antes dos tributos"
+    padrao: {codigos: ["3.07"], regex: "Antes dos Tributos"}
+
+  ir_csll:
+    rotulo: "IR e CSLL"
+    padrao:     {codigos: ["3.08"], regex: "Imposto de Renda"}
+    banco:      {codigos: ["3.06"], regex: "Imposto de Renda"}
+    seguradora: {codigos: ["3.06", "3.08"], regex: "Imposto de Renda"}
+
+  lucro_liquido:
+    rotulo: "Lucro/prejuizo consolidado do periodo"
+    padrao:     {codigos: ["3.11"], regex: "Consolidado do Per.odo"}
+    banco:      {codigos: ["3.11"], regex: "Consolidado do Per.odo"}
+    seguradora: {codigos: ["3.11"], regex: "Consolidado do Per.odo"}
+
+  # ---- Fluxo de caixa ----
+  fco:
+    rotulo: "Caixa liquido das atividades operacionais"
+    padrao:     {codigos: ["6.01"], regex: "Operacionais"}
+    banco:      {codigos: ["6.01"], regex: "Operacionais"}
+    seguradora: {codigos: ["6.01"], regex: "Operacionais"}
+
+  fci:
+    rotulo: "Caixa liquido das atividades de investimento"
+    padrao:     {codigos: ["6.02"], regex: "Investimento"}
+    banco:      {codigos: ["6.02"], regex: "Investimento"}
+    seguradora: {codigos: ["6.02"], regex: "Investimento"}
+
+  fcf:
+    rotulo: "Caixa liquido das atividades de financiamento"
+    padrao:     {codigos: ["6.03"], regex: "Financiamento"}
+    banco:      {codigos: ["6.03"], regex: "Financiamento"}
+    seguradora: {codigos: ["6.03"], regex: "Financiamento"}
+
+# --- Depreciacao e amortizacao (heuristica) ----------------------------------
+# NAO existe conta padronizada para D&A na DFP. O motor procura, dentro da
+# subarvore 6.01 (atividades operacionais) da DFC, linhas cuja descricao case
+# com o regex abaixo, descarta linhas que sejam conta-pai de outra ja capturada
+# (evita dupla contagem) e soma o restante.
+# Consequencia: EBITDA e Divida Liquida/EBITDA sao ESTIMADOS. A cobertura real
+# aparece na aba "Qualidade dos dados".
+depreciacao_amortizacao:
+  raiz: "6.01"
+  regex: "deprecia|amortiza"
+  excluir_regex: "reversao de amortiza"
