@@ -45,12 +45,14 @@ Download em: https://dados.cvm.gov.br/dataset/cia_aberta-doc-dfp
 
 ```
 app.py                      interface Streamlit
+gerar_snapshot.py           congela o resultado para publicação
 core/
   ingestao.py               detecta tipo de arquivo, resolve encoding, abre ZIPs
   normalizacao.py           versão, escala monetária, exercícios, setores
   conceitos.py              plano de contas → conceitos canônicos
   indicadores.py            motor de fórmulas
   agregacao.py              estatísticas setoriais
+  snapshot.py               grava e lê o resultado em Parquet
 config/
   conceitos.yaml            CD_CONTA → conceito, por plano de contas
   indicadores.yaml          dicionário de indicadores (numerador / denominador)
@@ -74,6 +76,33 @@ res.setorial_financeira
 res.diagnostico                 # cobertura e descartes
 res.conflitos                   # divergências entre divulgação e reapresentação
 ```
+
+---
+
+## Compartilhar o painel com a equipe
+
+O aplicativo começa vazio: quem abre precisa carregar os arquivos. Isso funciona
+para quem analisa, não para quem só quer consultar. Para publicar um link em que
+o painel já aparece pronto, congele o resultado num snapshot.
+
+```bash
+python gerar_snapshot.py --rotulo "DFP 2015-2025"
+```
+
+O comando roda o pipeline completo sobre `./dados` e grava `snapshot/*.parquet` —
+alguns MB, contra centenas de MB dos CSVs originais. Com o snapshot presente, o
+`app.py` o carrega sozinho ao abrir e mostra a origem **Painel publicado** na
+barra lateral; as outras duas origens continuam funcionando para recalcular.
+
+Para publicar no [Streamlit Community Cloud](https://share.streamlit.io):
+
+1. `git add snapshot && git commit -m "dados: atualiza snapshot" && git push`
+2. Aponte o Community Cloud para o repositório, arquivo `app.py`.
+3. Quando sair o DFP do ano novo, regenere o snapshot e dê `push` — o app
+   atualiza sozinho.
+
+Os dados da CVM são públicos, então o repositório pode ser público. O plano
+gratuito permite apps públicos ilimitados e apenas um app privado.
 
 ---
 

@@ -17,6 +17,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import core  # noqa: E402
 from core.agregacao import formatar_valor, posicao_relativa, ranking_empresas  # noqa: E402
 
+DIR_SNAPSHOT = core.snapshot.DIR_PADRAO
+TEM_SNAPSHOT = core.snapshot.existe(DIR_SNAPSHOT)
+
 TINTA = "#16202A"
 VERDE = "#1F6F6B"
 AMBAR = "#B4741A"
@@ -53,6 +56,22 @@ st.markdown(
 @st.cache_data(show_spinner=False, max_entries=3)
 def _rodar(arquivos: list[tuple[str, bytes]], prioridade: str):
     return core.executar(arquivos, prioridade=prioridade)
+
+
+@st.cache_data(show_spinner=False, max_entries=1)
+def _ler_snapshot(diretorio: str, _assinatura: float):
+    """Le o painel ja calculado. A assinatura entra so como chave de cache:
+    quando o snapshot e republicado, o mtime muda e o cache cai sozinho."""
+    return core.snapshot.carregar(diretorio)
+
+
+def _data_legivel(iso: str) -> str:
+    """2026-08-25T16:40:00-03:00 -> 25/08/2026."""
+    try:
+        a, m, d = iso[:10].split("-")
+        return f"{d}/{m}/{a}"
+    except ValueError:
+        return iso
 
 
 def _grafico_faixa(dados: pd.DataFrame, formato: str, rotulo: str) -> alt.Chart:
@@ -115,14 +134,33 @@ with st.sidebar:
     st.markdown('<div class="eyebrow">Bases</div>', unsafe_allow_html=True)
     st.markdown("### Carregar dados")
 
+    origens = ["Enviar arquivos", "Ler de uma pasta"]
+    if TEM_SNAPSHOT:
+        origens.insert(0, "Painel publicado")
+
     modo = st.radio(
         "Origem dos arquivos",
-        ["Enviar arquivos", "Ler de uma pasta"],
+        origens,
         label_visibility="collapsed",
     )
 
     arquivos: list[tuple[str, bytes]] = []
-    if modo == "Enviar arquivos":
+    if modo == "Painel publicado":
+        meta = core.snapshot.ler_meta(DIR_SNAPSHOT)
+        anos_pub = meta.get("anos") or []
+        if anos_pub:
+            st.caption(
+                f"Exercícios {min(anos_pub)}–{max(anos_pub)} · "
+                f"{meta.get('companhias', 0)} companhias · "
+                f"{meta.get('setores', 0)} setores"
+            )
+        if meta.get("rotulo"):
+            st.caption(meta["rotulo"])
+        st.caption(f"Publicado em {_data_legivel(meta.get('gerado_em', ''))}.")
+        st.caption(
+            "Para recalcular a partir dos arquivos da CVM, troque a origem acima."
+        )
+    elif modo == "Enviar arquivos":
         enviados = st.file_uploader(
             "CSVs da CVM ou o ZIP anual completo",
             type=["csv", "zip"],
@@ -156,12 +194,20 @@ with st.sidebar:
              "arquivo N+1, às vezes com valor diferente por reapresentação contábil.",
     )
 
-    processar = st.button("Processar bases", type="primary", use_container_width=True,
-                          disabled=not arquivos)
+    if modo == "Painel publicado":
+        processar = False
+    else:
+        processar = st.button("Processar bases", type="primary",
+                              use_container_width=True, disabled=not arquivos)
 
 if processar:
     with st.spinner("Lendo, normalizando e calculando…"):
         st.session_state["res"] = _rodar(arquivos, prioridade)
+elif st.session_state.get("res") is None and TEM_SNAPSHOT:
+    with st.spinner("Carregando painel publicado…"):
+        st.session_state["res"] = _ler_snapshot(
+            DIR_SNAPSHOT, core.snapshot.assinatura(DIR_SNAPSHOT)
+        )
 
 res: core.Resultado | None = st.session_state.get("res")
 

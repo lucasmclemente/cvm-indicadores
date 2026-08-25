@@ -23,15 +23,18 @@ streamlit run app.py
 
 ## Arquitetura
 ```
-app.py          interface Streamlit (528 linhas, 6 abas)
-core/           motor, usável como biblioteca independente da UI
-  ingestao      detecta tipo de arquivo, resolve encoding, abre ZIPs
-  normalizacao  versão, escala monetária, exercícios, setores
-  conceitos     plano de contas → conceitos canônicos
-  indicadores   motor de fórmulas
-  agregacao     estatísticas setoriais
-config/         conceitos.yaml · indicadores.yaml · setores.yaml
-dados/          arquivos da CVM (fora do git)
+app.py            interface Streamlit (6 abas)
+gerar_snapshot.py script que congela o resultado para publicação
+core/             motor, usável como biblioteca independente da UI
+  ingestao        detecta tipo de arquivo, resolve encoding, abre ZIPs
+  normalizacao    versão, escala monetária, exercícios, setores
+  conceitos       plano de contas → conceitos canônicos
+  indicadores     motor de fórmulas
+  agregacao       estatísticas setoriais
+  snapshot        grava/lê o Resultado em Parquet
+config/           conceitos.yaml · indicadores.yaml · setores.yaml
+dados/            arquivos brutos da CVM (fora do git)
+snapshot/         resultado calculado (dentro do git — alimenta o painel público)
 ```
 
 Ponto de entrada como biblioteca: `core.executar(arquivos)` ou
@@ -63,6 +66,13 @@ indicador; o relatório das financeiras tem aba própria.
 
 **Mediana, não média,** para o corte setorial; o agregado do setor entra como
 leitura ponderada, ao lado, não no lugar.
+
+**O painel compartilhado lê snapshot, não CSV.** A ingestão é pesada demais para
+hospedagem grátis (~1 GB de memória) e exigiria que cada pessoa subisse os
+arquivos. Então `gerar_snapshot.py` roda o pipeline na máquina de quem publica e
+grava `snapshot/*.parquet` — poucos MB. O `app.py` carrega esse snapshot sozinho
+quando ele existe, e as origens "Enviar arquivos" / "Ler de uma pasta" continuam
+disponíveis para recalcular. Nenhuma regra de negócio mora aí: é só persistência.
 
 ## Convenções de código
 - Código Python é **ASCII puro** (docstrings e comentários sem acento). Acentuação

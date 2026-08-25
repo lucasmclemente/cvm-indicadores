@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import pandas as pd
 import yaml
 
-from . import agregacao, conceitos, indicadores, ingestao, normalizacao
+from . import agregacao, conceitos, indicadores, ingestao, normalizacao, snapshot
 
 DIR_CONFIG = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config")
 
@@ -95,5 +95,5 @@ def executar_pasta(caminho: str, **kwargs) -> Resultado:
 
 __all__ = [
     "executar", "executar_pasta", "carregar_config", "Resultado",
-    "ingestao", "normalizacao", "conceitos", "indicadores", "agregacao",
+    "ingestao", "normalizacao", "conceitos", "indicadores", "agregacao", "snapshot",
 ]

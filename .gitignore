@@ -15,3 +15,7 @@ dados/*.xlsx
 .streamlit/secrets.toml
 .DS_Store
 Thumbs.db
+
+# O snapshot publicado ENTRA no repositorio (e ele que alimenta o painel
+# compartilhado). Gere com: python gerar_snapshot.py
+!snapshot/
