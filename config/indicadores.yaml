@@ -234,6 +234,37 @@ indicadores:
     den_positivo: true
     interpretacao: "Quanto do resultado operacional vira caixa de fato."
 
+  # ------------------------------ FLUXO DE CAIXA -----------------------------
+  geracao_caixa_operacional:
+    rotulo: "Geracao de caixa operacional (R$)"
+    grupo: Fluxo de caixa
+    familias: [nao_financeira, financeira]
+    formato: moeda
+    num: "fco"
+    den: "1"
+    agregacao_soma: true
+    interpretacao: "Caixa liquido gerado pelas atividades operacionais no exercicio. Conta padronizada 6.01, antes de investimentos, dividas e dividendos."
+
+  geracao_caixa_liquida:
+    rotulo: "Geracao de caixa livre (FCO + FCI)"
+    grupo: Fluxo de caixa
+    familias: [nao_financeira]
+    formato: moeda
+    num: "fco + fci"
+    den: "1"
+    agregacao_soma: true
+    interpretacao: "Caixa da operacao depois dos investimentos, antes de divida e dividendos: o que sobra para remunerar credor e acionista. O FCI entra somado porque ja vem negativo na DFC. Fora do relatorio das financeiras, onde 'investimento' inclui compra de titulos e a medida perde sentido."
+
+  distribuicao_dividendos:
+    rotulo: "Distribuicao de dividendos (% da receita liquida)"
+    grupo: Fluxo de caixa
+    familias: [nao_financeira, financeira]
+    formato: percentual
+    num: "dividendos_pagos"
+    den: "receita_liquida"
+    den_positivo: true
+    interpretacao: "Dividendos e JCP efetivamente pagos no exercicio sobre a receita liquida. Sai da DFC como conta livre, entao e ESTIMADO: confira a cobertura na aba de qualidade. Holdings passam de 100% porque distribuem o que recebem de controladas, nao o que faturam."
+
 # --- Regras de saneamento aplicadas antes da agregacao setorial ---------------
 # Sem isso, uma empresa com PL de R$ 1 mil e lucro de R$ 50 milhoes produz um
 # ROE de 5.000.000% que arrasta qualquer media do setor.

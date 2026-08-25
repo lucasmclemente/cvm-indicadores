@@ -55,6 +55,14 @@ permite calcular as duas visões setoriais a partir da mesma definição — med
 razões individuais **e** razão agregada do setor (`soma(num) / soma(den)`). Nunca
 declarar um indicador como valor único já dividido.
 
+**Conceito sem conta padronizada vira heurística declarada.** Alguns conceitos
+não existem como conta fixa na DFP — D&A e dividendos pagos são os casos atuais.
+Para esses, `conceitos_heuristicos` em `config/conceitos.yaml` declara subárvore,
+regex de inclusão e de exclusão; `conceitos.extrair_heuristicos` aplica a regra e
+descarta contas-pai para não contar duas vezes. O Python não conhece nenhum
+desses conceitos pelo nome. Tudo que sai daí é **estimado** e precisa dizê-lo na
+`interpretacao` do indicador.
+
 **Nada é descartado em silêncio.** Toda observação filtrada (denominador pequeno,
 razão implausível, período não anual, conta não padronizada) tem que aparecer
 contabilizada em `diagnostico` e chegar à aba "Qualidade dos dados".

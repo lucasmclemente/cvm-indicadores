@@ -89,36 +89,30 @@ def resolver_conceitos(fatos: pd.DataFrame, planos: pd.DataFrame, cfg: dict) -> 
     return longo
 
 
-def extrair_depreciacao(fatos: pd.DataFrame, cfg: dict) -> pd.DataFrame:
-    """Estima depreciacao e amortizacao a partir da DFC.
+def extrair_heuristicos(fatos: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+    """Extrai conceitos que a DFP nao padroniza, por descricao da conta.
 
-    A DFP nao tem conta padronizada para D&A. A extracao percorre a subarvore
-    das atividades operacionais procurando descricoes que mencionem depreciacao
-    ou amortizacao. Contas-pai de outra ja capturada sao descartadas para nao
-    contar o mesmo valor duas vezes.
+    Alguns conceitos economicamente relevantes nao tem conta fixa na DFP:
+    depreciacao e amortizacao nao existem como linha padronizada, e dividendos
+    pagos aparecem como conta livre dentro das atividades de financiamento, em
+    dezenas de grafias diferentes. Para esses, a unica saida e casar a descricao.
 
-    Toda metrica derivada daqui (EBITDA, Divida Liquida/EBITDA) e ESTIMADA e
-    deve ser lida junto com a cobertura reportada na aba de qualidade.
+    Cada conceito e declarado em config/conceitos.yaml sob `conceitos_heuristicos`,
+    com a subarvore onde procurar, o regex de inclusao e, opcionalmente, um regex
+    de exclusao. Nenhum conceito e conhecido por este modulo.
+
+    Contas-pai de outra ja capturada sao descartadas para nao contar o mesmo
+    valor duas vezes. Toda metrica derivada daqui e ESTIMADA, e a cobertura real
+    aparece na aba "Qualidade dos dados".
     """
-    regra = cfg.get("depreciacao_amortizacao", {})
-    raiz = regra.get("raiz", "6.01")
-    regex = regra.get("regex", "deprecia|amortiza")
-    excluir = regra.get("excluir_regex")
+    regras = cfg.get("conceitos_heuristicos", {})
+    vazio = pd.DataFrame(columns=["cnpj", "ano", "conceito", "valor"])
+    if not regras:
+        return vazio
 
     dfc = fatos[fatos["demonstracao"] == "DFC"].copy()
     if dfc.empty:
-        return pd.DataFrame(columns=["cnpj", "ano", "conceito", "valor"])
-
-    alvo = dfc[
-        dfc["cd_conta"].astype(str).str.startswith(raiz)
-        & dfc["ds_conta"].fillna("").str.contains(regex, case=False, regex=True)
-    ].copy()
-    if excluir:
-        alvo = alvo[
-            ~alvo["ds_conta"].fillna("").str.contains(excluir, case=False, regex=True)
-        ]
-    if alvo.empty:
-        return pd.DataFrame(columns=["cnpj", "ano", "conceito", "valor"])
+        return vazio
 
     def _sem_pais(grupo: pd.DataFrame) -> pd.DataFrame:
         codigos = sorted(grupo["cd_conta"].astype(str).unique())
@@ -128,18 +122,42 @@ def extrair_depreciacao(fatos: pd.DataFrame, cfg: dict) -> pd.DataFrame:
         }
         return grupo[~grupo["cd_conta"].astype(str).isin(pais)]
 
-    alvo = (
-        alvo.groupby(["cnpj", "ano"], group_keys=False)[alvo.columns.tolist()]
-        .apply(_sem_pais)
-    )
-    agregado = (
-        alvo.groupby(["cnpj", "ano"], as_index=False)["valor"].sum()
-        .assign(conceito="depreciacao_amortizacao")
-    )
-    # Na DFC a D&A entra como ajuste positivo ao lucro; o sinal negativo
-    # ocasional vem de apresentacao invertida e e corrigido aqui.
-    agregado["valor"] = agregado["valor"].abs()
-    return agregado[["cnpj", "ano", "conceito", "valor"]]
+    blocos: list[pd.DataFrame] = []
+    for conceito, regra in regras.items():
+        raiz = str(regra.get("raiz", ""))
+        regex = regra.get("regex")
+        if not regex:
+            continue
+
+        alvo = dfc[
+            dfc["cd_conta"].astype(str).str.startswith(raiz)
+            & dfc["ds_conta"].fillna("").str.contains(regex, case=False, regex=True)
+        ].copy()
+        if regra.get("excluir_regex"):
+            alvo = alvo[
+                ~alvo["ds_conta"].fillna("").str.contains(
+                    regra["excluir_regex"], case=False, regex=True
+                )
+            ]
+        if alvo.empty:
+            continue
+
+        alvo = (
+            alvo.groupby(["cnpj", "ano"], group_keys=False)[alvo.columns.tolist()]
+            .apply(_sem_pais)
+        )
+        agregado = (
+            alvo.groupby(["cnpj", "ano"], as_index=False)["valor"].sum()
+            .assign(conceito=conceito)
+        )
+        # D&A entra como ajuste positivo ao lucro e dividendos como saida
+        # negativa de caixa; em ambos o sinal e convencao de apresentacao, nao
+        # informacao. `valor_absoluto` normaliza o conceito para positivo.
+        if regra.get("valor_absoluto", True):
+            agregado["valor"] = agregado["valor"].abs()
+        blocos.append(agregado[["cnpj", "ano", "conceito", "valor"]])
+
+    return pd.concat(blocos, ignore_index=True) if blocos else vazio
 
 
 def montar_painel(
@@ -147,9 +165,9 @@ def montar_painel(
 ) -> pd.DataFrame:
     """Painel largo final: uma linha por (companhia, ano), conceitos em colunas."""
     conceitos = resolver_conceitos(fatos, planos, cfg)
-    dep = extrair_depreciacao(fatos, cfg)
-    if not dep.empty:
-        conceitos = pd.concat([conceitos, dep], ignore_index=True)
+    heuristicos = extrair_heuristicos(fatos, cfg)
+    if not heuristicos.empty:
+        conceitos = pd.concat([conceitos, heuristicos], ignore_index=True)
 
     if conceitos.empty:
         return pd.DataFrame()

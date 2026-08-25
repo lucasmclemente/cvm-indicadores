@@ -177,14 +177,38 @@ conceitos:
     banco:      {codigos: ["6.03"], regex: "Financiamento"}
     seguradora: {codigos: ["6.03"], regex: "Financiamento"}
 
-# --- Depreciacao e amortizacao (heuristica) ----------------------------------
-# NAO existe conta padronizada para D&A na DFP. O motor procura, dentro da
-# subarvore 6.01 (atividades operacionais) da DFC, linhas cuja descricao case
-# com o regex abaixo, descarta linhas que sejam conta-pai de outra ja capturada
-# (evita dupla contagem) e soma o restante.
-# Consequencia: EBITDA e Divida Liquida/EBITDA sao ESTIMADOS. A cobertura real
-# aparece na aba "Qualidade dos dados".
-depreciacao_amortizacao:
-  raiz: "6.01"
-  regex: "deprecia|amortiza"
-  excluir_regex: "reversao de amortiza"
+  variacao_caixa:
+    rotulo: "Aumento (reducao) de caixa e equivalentes"
+    padrao:     {codigos: ["6.05"], regex: "Caixa e Equivalentes"}
+    banco:      {codigos: ["6.05"], regex: "Caixa e Equivalentes"}
+    seguradora: {codigos: ["6.05"], regex: "Caixa e Equivalentes"}
+
+# --- Conceitos sem conta padronizada (heuristica por descricao) --------------
+# Estes conceitos NAO tem conta fixa na DFP, entao a unica saida e casar a
+# descricao da conta. O motor procura dentro da subarvore indicada, descarta
+# linhas que sejam conta-pai de outra ja capturada (evita dupla contagem) e
+# soma o restante.
+#
+# Tudo que deriva daqui e ESTIMADO. A cobertura real de cada indicador aparece
+# na aba "Qualidade dos dados" - leia antes de citar o numero.
+conceitos_heuristicos:
+
+  # D&A nao existe como linha padronizada. Sem ela nao ha EBITDA: por isso,
+  # sem o arquivo DFC_MI, EBITDA e Divida Liquida/EBITDA ficam vazios.
+  depreciacao_amortizacao:
+    raiz: "6.01"
+    regex: "deprecia|amortiza"
+    excluir_regex: "reversao de amortiza"
+    valor_absoluto: true
+
+  # Dividendos e JCP pagos sao conta livre dentro das atividades de
+  # financiamento, com dezenas de grafias ("Dividendos pagos", "Pagamento de
+  # dividendos", "Juros sobre o capital proprio pagos"). Empresas que declaram
+  # dividendos e JCP em linhas separadas tem as duas somadas.
+  # "recebidos" fica de fora: dividendo recebido de coligada e entrada de
+  # caixa, nao distribuicao ao acionista.
+  dividendos_pagos:
+    raiz: "6.03"
+    regex: "dividendo|juros sobre (?:o )?capital"
+    excluir_regex: "recebid"
+    valor_absoluto: true

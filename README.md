@@ -151,6 +151,20 @@ não contar duas vezes. Consequência prática: **sem o arquivo `DFC_MI`, a cobe
 de EBITDA, Dívida Líquida/EBITDA e conversão de caixa fica próxima de zero**,
 porque a ampla maioria das companhias usa o método indireto.
 
+**Caixa livre distorcido por risco sacado.** Varejistas que antecipam pagamento
+a fornecedores registram a entrada em atividades operacionais e a liquidação em
+financiamento. O FCO — e com ele o caixa livre — infla, enquanto o financiamento
+drena o mesmo valor. Magazine Luiza aparece com R$ 14,5 bi de caixa livre em 2024
+e variação líquida de caixa de −R$ 0,8 bi exatamente por isso. Leia o indicador
+ao lado da conta 6.05, não sozinho.
+
+**Dividendos saem de conta livre.** A DFC não padroniza a linha de dividendos
+pagos: ela aparece em dezenas de grafias dentro das atividades de financiamento.
+A extração casa a descrição e soma dividendos com JCP, excluindo dividendos
+*recebidos*. Cobertura de ~99% das companhias com receita, mas é estimativa.
+Holdings passam de 100% da receita porque distribuem o que recebem de
+controladas, não o que faturam.
+
 **Setor é um retrato do presente.** A base cadastral é um instantâneo. O setor
 atribuído a uma companhia vale para todos os anos do painel; reclassificações
 setoriais passadas não são recuperáveis a partir desses arquivos.
