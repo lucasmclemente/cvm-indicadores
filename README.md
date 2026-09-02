@@ -56,10 +56,18 @@ mesmo recorte, entre anos diferentes:
 | 2º trimestre | abr–jun (isolado) | ITR do 2º trimestre |
 | 3º trimestre | jul–set (isolado) | ITR do 3º trimestre |
 
-Só existe aqui o que a CVM publica. **4º trimestre isolado e 2º semestre não
-aparecem**: a CVM não os divulga, e obtê-los exigiria subtrair o acumulado do
-exercício fechado — uma conta que o projeto não faz porque reapresentação
-contábil entre os dois documentos produziria número sem lastro.
+Só existe aqui o que a CVM publica. Nada é derivado por subtração: obter um 4º
+trimestre a partir do exercício fechado menos o acumulado de nove meses juntaria
+duas safras de reapresentação contábil e produziria número sem lastro.
+
+**4º trimestre e 2º semestre não são oferecidos como recorte.** Eles existem no
+painel, mas por efeito colateral do calendário: a classificação usa a janela
+civil, então o trimestre outubro–dezembro de uma companhia que fecha o exercício
+em março é, civilmente, um 4º trimestre. Isso reúne 18 companhias no 4T e 5 no
+2S — usinas de açúcar e álcool, sobretudo. Como corte setorial seria uma amostra
+mínima lida como se fosse o mercado, então `normalizacao.PERIODOS` marca os dois
+como `oculto`. O dado continua no painel e na planilha exportada; só não aparece
+no seletor.
 
 ---
 
@@ -234,8 +242,12 @@ aberta por recorte.
 
 **Companhia com exercício social deslocado fica fora dos recortes parciais.** A
 classificação de período assume o ano civil para trimestres e semestres. Quem
-fecha o exercício em março continua íntegro no recorte anual, mas seus ITR não
-são classificados — e o descarte aparece contado na aba de qualidade.
+fecha o exercício em março continua íntegro no recorte anual, mas seus trimestres
+fiscais começam em abril ou julho e não casam com nenhuma janela civil — o
+descarte aparece contado na aba de qualidade. São cerca de dez companhias por
+ano: Camil, Raízen, São Martinho, Jalles Machado, Cerradinho, CTC e assemelhadas.
+A exceção é o trimestre outubro–dezembro delas, que coincide com o civil e por
+isso alimenta os recortes ocultos 4T e 2S.
 
 **Composição setorial muda entre anos.** Empresas abrem e fecham capital. Uma
 variação na mediana do setor pode refletir mudança de composição, não desempenho.

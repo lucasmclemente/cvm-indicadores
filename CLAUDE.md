@@ -77,12 +77,22 @@ leitura ponderada, ao lado, não no lugar.
 
 **Cada observação vive num período.** A chave é `(cnpj, ano, periodo)`, nunca
 `(cnpj, ano)`. `periodo` vale `ano` (DFP), `1T`, `1S`, `9M` (acumulados do ITR) ou
-`2T`, `3T` (trimestres isolados) — só o que a CVM publica; 4T e 2S não existem
-porque exigiriam subtração. Recortes nunca se misturam numa mesma estatística, e
-a UI compara sempre o mesmo recorte entre anos. Em recorte parcial, indicadores
-de fluxo sobre saldo (ROE, ROA, giro) **não são anualizados** — o painel avisa.
-`MED()` acha o saldo de abertura pela data (fim do período anterior), não pela
-linha vizinha do painel.
+`2T`, `3T` (trimestres isolados). Nada é derivado por subtração. `4T` e `2S`
+também aparecem, mas só para as ~18 companhias de exercício deslocado cujo
+trimestre outubro–dezembro coincide com o civil: ficam marcados como `oculto` em
+`normalizacao.PERIODOS` e fora do seletor, sem sair dos dados. Recortes nunca se
+misturam numa mesma estatística, e a UI compara sempre o mesmo recorte entre
+anos. Em recorte parcial, indicadores de fluxo sobre saldo (ROE, ROA, giro)
+**não são anualizados** — o painel avisa. `MED()` acha o saldo de abertura pelo
+mês de encerramento do período anterior, não pela linha vizinha do painel.
+
+**DFP e ITR não são o mesmo dicionário de contas.** A mesma companhia, no mesmo
+exercício, pode reportar a conta com `CD_CONTA` diferente em cada documento — e
+há banco que muda o código do patrimônio líquido entre os dois. Por isso uma
+demonstração de um período vem de um documento só (`PREFERENCIA_ORIGEM`, DFP
+primeiro) e o plano de contas é detectado por documento, não por companhia.
+Misturar as duas fontes dobrava conceitos heurísticos e apagava conceitos
+padronizados.
 
 **O painel compartilhado lê snapshot, não CSV.** A ingestão é pesada demais para
 hospedagem grátis (~1 GB de memória) e exigiria que cada pessoa subisse os

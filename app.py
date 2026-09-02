@@ -293,9 +293,7 @@ if len(periodos) > 1:
             format_func=_rotulo_com_n,
             help="A DFP traz o exercício fechado; o ITR traz o acumulado do ano "
                  "até o trimestre e o trimestre isolado. Cada recorte é comparado "
-                 "só com ele mesmo, em outros anos. O 4º trimestre e o 2º semestre "
-                 "só reúnem companhias de exercício social deslocado, que fecham "
-                 "em março ou junho — amostra pequena, não o mercado.",
+                 "só com ele mesmo, em outros anos.",
         )
 else:
     periodo = periodos[0]

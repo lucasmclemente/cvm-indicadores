@@ -46,10 +46,15 @@ class Resultado:
 
     @property
     def periodos(self) -> list[str]:
-        """Periodos presentes no painel, do mais longo para o mais curto."""
+        """Recortes comparaveis presentes no painel, do mais longo ao mais curto.
+
+        Deixa de fora os periodos marcados como ocultos em normalizacao.PERIODOS:
+        eles continuam no `painel` e nos `indicadores`, e so nao sao oferecidos
+        como corte setorial. Para ver todos, leia a coluna `periodo` do painel.
+        """
         if self.painel.empty or "periodo" not in self.painel.columns:
             return ["ano"]
-        return normalizacao.ordenar_periodos(self.painel["periodo"].unique().tolist())
+        return normalizacao.periodos_visiveis(self.painel["periodo"].unique().tolist())
 
 
 def executar(
