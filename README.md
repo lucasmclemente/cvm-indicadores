@@ -121,8 +121,23 @@ python gerar_snapshot.py --rotulo "DFP 2015-2025"
 
 O comando roda o pipeline completo sobre `./dados` e grava `snapshot/*.parquet` —
 alguns MB, contra centenas de MB dos CSVs originais. Com o snapshot presente, o
-`app.py` o carrega sozinho ao abrir e mostra a origem **Painel publicado** na
-barra lateral; as outras duas origens continuam funcionando para recalcular.
+`app.py` o carrega sozinho ao abrir.
+
+### Quem pode recalcular
+
+Na máquina de quem analisa, as origens **Enviar arquivos** e **Ler de uma pasta**
+continuam disponíveis. No painel publicado elas somem, e a única entrada é o
+snapshot.
+
+A detecção é pela presença dos arquivos brutos: se `dados/` tem CSV ou ZIP, esta
+é a máquina que gera o snapshot. Na hospedagem não há — `dados/` está no
+`.gitignore`. Para forçar o recálculo em qualquer ambiente,
+`CVM_PERMITIR_RECALCULO=1`.
+
+Isso não é pudor com dado público: a ingestão consome perto de 1 GB, e um
+visitante que subisse os CSVs derrubaria a hospedagem gratuita para todo mundo.
+"Ler de uma pasta", num servidor, também não leria a máquina de quem acessa —
+leria o sistema de arquivos do contêiner.
 
 Para publicar no [Streamlit Community Cloud](https://share.streamlit.io):
 

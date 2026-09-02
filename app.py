@@ -20,6 +20,39 @@ from core.normalizacao import rotulo_periodo  # noqa: E402
 
 DIR_SNAPSHOT = core.snapshot.DIR_PADRAO
 TEM_SNAPSHOT = core.snapshot.existe(DIR_SNAPSHOT)
+DIR_DADOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dados")
+
+
+def _tem_arquivos_brutos(caminho: str) -> bool:
+    """Ha CSV ou ZIP da CVM nesta pasta?"""
+    try:
+        for _raiz, _dirs, nomes in os.walk(caminho):
+            if any(n.lower().endswith((".csv", ".zip")) for n in nomes):
+                return True
+    except OSError:
+        pass
+    return False
+
+
+def _permite_recalculo() -> bool:
+    """Recalcular pelo navegador so faz sentido na maquina de quem analisa.
+
+    No painel publicado a opcao sai do ar. Nao e pudor: a ingestao dos arquivos
+    da CVM consome perto de 1 GB, e um visitante que subisse os CSVs derrubaria
+    a hospedagem gratuita para todo mundo. Ler de uma pasta, ali, tambem nao
+    leria a maquina de quem acessa - leria o sistema de arquivos do servidor.
+
+    A deteccao e pela presenca dos arquivos brutos: quem tem `dados/` populado
+    esta na maquina que gera o snapshot. `CVM_PERMITIR_RECALCULO=1` forca.
+    """
+    if os.environ.get("CVM_PERMITIR_RECALCULO") == "1":
+        return True
+    if not TEM_SNAPSHOT:
+        return True  # sem snapshot, carregar arquivos e a unica saida
+    return _tem_arquivos_brutos(DIR_DADOS)
+
+
+PERMITE_RECALCULO = _permite_recalculo()
 
 TINTA = "#16202A"
 VERDE = "#1F6F6B"
@@ -143,11 +176,14 @@ with st.sidebar:
     if TEM_SNAPSHOT:
         origens.insert(0, "Painel publicado")
 
-    modo = st.radio(
-        "Origem dos arquivos",
-        origens,
-        label_visibility="collapsed",
-    )
+    if PERMITE_RECALCULO:
+        modo = st.radio(
+            "Origem dos arquivos",
+            origens,
+            label_visibility="collapsed",
+        )
+    else:
+        modo = "Painel publicado"
 
     arquivos: list[tuple[str, bytes]] = []
     if modo == "Painel publicado":
@@ -167,9 +203,16 @@ with st.sidebar:
         if meta.get("rotulo"):
             st.caption(meta["rotulo"])
         st.caption(f"Publicado em {_data_legivel(meta.get('gerado_em', ''))}.")
-        st.caption(
-            "Para recalcular a partir dos arquivos da CVM, troque a origem acima."
-        )
+        if PERMITE_RECALCULO:
+            st.caption(
+                "Para recalcular a partir dos arquivos da CVM, troque a origem acima."
+            )
+        else:
+            st.caption(
+                "Painel congelado a partir das bases públicas da CVM. Para "
+                "recalcular, rode o projeto localmente — o repositório traz o "
+                "script `gerar_snapshot.py`."
+            )
     elif modo == "Enviar arquivos":
         enviados = st.file_uploader(
             "CSVs da CVM ou o ZIP anual completo",
@@ -192,20 +235,25 @@ with st.sidebar:
         elif pasta:
             st.warning("Pasta não encontrada.")
 
-    st.divider()
-    st.markdown('<div class="eyebrow">Regra de desempate</div>', unsafe_allow_html=True)
-    prioridade = st.radio(
-        "Quando o mesmo exercício aparece em dois arquivos",
-        ["ultimo", "reapresentado"],
-        format_func=lambda x: (
-            "Número original do ano" if x == "ultimo" else "Número reapresentado"
-        ),
-        help="Cada arquivo anual traz dois exercícios. Ao carregar vários anos, "
-             "o exercício N aparece como ÚLTIMO no arquivo N e como PENÚLTIMO no "
-             "arquivo N+1, às vezes com valor diferente por reapresentação contábil.",
-    )
+    # A regra de desempate so entra em jogo ao reprocessar os arquivos: o
+    # snapshot ja foi gravado com a escolha de quem publicou.
+    prioridade = "ultimo"
+    if PERMITE_RECALCULO:
+        st.divider()
+        st.markdown('<div class="eyebrow">Regra de desempate</div>',
+                    unsafe_allow_html=True)
+        prioridade = st.radio(
+            "Quando o mesmo exercício aparece em dois arquivos",
+            ["ultimo", "reapresentado"],
+            format_func=lambda x: (
+                "Número original do ano" if x == "ultimo" else "Número reapresentado"
+            ),
+            help="Cada arquivo anual traz dois exercícios. Ao carregar vários anos, "
+                 "o exercício N aparece como ÚLTIMO no arquivo N e como PENÚLTIMO no "
+                 "arquivo N+1, às vezes com valor diferente por reapresentação contábil.",
+        )
 
-    if modo == "Painel publicado":
+    if modo == "Painel publicado" or not PERMITE_RECALCULO:
         processar = False
     else:
         processar = st.button("Processar bases", type="primary",
