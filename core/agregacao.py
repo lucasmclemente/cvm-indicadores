@@ -21,7 +21,12 @@ import pandas as pd
 def agregar_por_setor(
     indicadores: pd.DataFrame, cfg: dict, familia: str | None = None
 ) -> pd.DataFrame:
-    """Consolida indicadores por setor e ano."""
+    """Consolida indicadores por setor, ano e periodo.
+
+    O periodo entra na chave, nunca dentro do mesmo grupo: a mediana de um setor
+    no 1o semestre e uma leitura, a do exercicio fechado e outra, e somar as duas
+    numa unica estatistica seria comparar seis meses com doze.
+    """
     if indicadores.empty:
         return pd.DataFrame()
 
@@ -32,7 +37,9 @@ def agregar_por_setor(
     n_min = int(cfg.get("saneamento", {}).get("n_minimo_setor", 5))
 
     dist = (
-        df.groupby(["setor", "ano", "indicador", "rotulo", "grupo", "formato"])
+        df.groupby(
+            ["setor", "ano", "periodo", "indicador", "rotulo", "grupo", "formato"]
+        )
         .agg(
             n_empresas=("cnpj", "nunique"),
             p25=("valor", lambda s: s.quantile(0.25)),
@@ -57,15 +64,20 @@ def agregar_por_setor(
     dist["amostra_reduzida"] = dist["n_empresas"] < n_min
 
     return dist.drop(columns=["soma_simples"]).sort_values(
-        ["grupo", "rotulo", "ano", "setor"]
+        ["grupo", "rotulo", "periodo", "ano", "setor"]
     ).reset_index(drop=True)
 
 
 def ranking_empresas(
-    indicadores: pd.DataFrame, indicador: str, ano: int, setor: str | None = None
+    indicadores: pd.DataFrame, indicador: str, ano: int,
+    setor: str | None = None, periodo: str = "ano",
 ) -> pd.DataFrame:
     """Ordena as companhias por um indicador, opcionalmente dentro de um setor."""
-    df = indicadores[(indicadores["indicador"] == indicador) & (indicadores["ano"] == ano)]
+    df = indicadores[
+        (indicadores["indicador"] == indicador)
+        & (indicadores["ano"] == ano)
+        & (indicadores["periodo"] == periodo)
+    ]
     if setor:
         df = df[df["setor"] == setor]
     return (
@@ -85,7 +97,7 @@ def posicao_relativa(indicadores: pd.DataFrame, cnpj: str) -> pd.DataFrame:
     if indicadores.empty:
         return pd.DataFrame()
 
-    grupo = indicadores.groupby(["setor", "ano", "indicador"])["valor"]
+    grupo = indicadores.groupby(["setor", "ano", "periodo", "indicador"])["valor"]
     base = indicadores.assign(
         mediana_setor=grupo.transform("median"),
         n_setor=grupo.transform("count"),
@@ -93,9 +105,9 @@ def posicao_relativa(indicadores: pd.DataFrame, cnpj: str) -> pd.DataFrame:
     )
     alvo = base[base["cnpj"] == cnpj]
     return alvo[
-        ["ano", "grupo", "rotulo", "indicador", "formato", "valor",
+        ["ano", "periodo", "grupo", "rotulo", "indicador", "formato", "valor",
          "mediana_setor", "percentil", "n_setor", "setor"]
-    ].sort_values(["ano", "grupo", "rotulo"]).reset_index(drop=True)
+    ].sort_values(["ano", "periodo", "grupo", "rotulo"]).reset_index(drop=True)
 
 
 def formatar_valor(valor: float, formato: str) -> str:

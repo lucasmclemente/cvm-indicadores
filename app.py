@@ -16,6 +16,7 @@ import streamlit as st
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import core  # noqa: E402
 from core.agregacao import formatar_valor, posicao_relativa, ranking_empresas  # noqa: E402
+from core.normalizacao import rotulo_periodo  # noqa: E402
 
 DIR_SNAPSHOT = core.snapshot.DIR_PADRAO
 TEM_SNAPSHOT = core.snapshot.existe(DIR_SNAPSHOT)
@@ -121,6 +122,10 @@ def _exportar_excel(res: core.Resultado) -> bytes:
         res.indicadores.to_excel(writer, sheet_name="Indicadores por empresa", index=False)
         res.painel.to_excel(writer, sheet_name="Painel de conceitos", index=False)
         res.diagnostico.to_excel(writer, sheet_name="Cobertura", index=False)
+        if not res.descartes_periodo.empty:
+            res.descartes_periodo.to_excel(
+                writer, sheet_name="Classificação de período", index=False
+            )
         res.planos.to_excel(writer, sheet_name="Planos de contas", index=False)
         if not res.conflitos.empty:
             res.conflitos.head(5000).to_excel(writer, sheet_name="Reapresentações", index=False)
@@ -154,6 +159,11 @@ with st.sidebar:
                 f"{meta.get('companhias', 0)} companhias · "
                 f"{meta.get('setores', 0)} setores"
             )
+        periodos_pub = meta.get("periodos") or []
+        if len(periodos_pub) > 1:
+            st.caption(
+                "Recortes: " + ", ".join(rotulo_periodo(p) for p in periodos_pub)
+            )
         if meta.get("rotulo"):
             st.caption(meta["rotulo"])
         st.caption(f"Publicado em {_data_legivel(meta.get('gerado_em', ''))}.")
@@ -165,8 +175,9 @@ with st.sidebar:
             "CSVs da CVM ou o ZIP anual completo",
             type=["csv", "zip"],
             accept_multiple_files=True,
-            help="Aceita dfp_cia_aberta_BPA/BPP/DRE/DFC_*_con de qualquer ano, "
-                 "mais a base cadastral. Arquivos de DF individual são ignorados.",
+            help="Aceita dfp_cia_aberta_* (anual) e itr_cia_aberta_* "
+                 "(trimestral) de BPA/BPP/DRE/DFC, mais a base cadastral. "
+                 "Arquivos de DF individual são ignorados.",
         )
         arquivos = [(f.name, f.getvalue()) for f in enviados] if enviados else []
     else:
@@ -220,7 +231,8 @@ if res is None:
     st.title("Indicadores setoriais de companhias abertas")
     st.markdown(
         """
-        Envie os arquivos DFP de quantos anos quiser. O sistema empilha as bases,
+        Envie os arquivos DFP (anuais) e, se quiser o recorte intermediário,
+        os ITR (trimestrais) de quantos anos quiser. O sistema empilha as bases,
         resolve as diferenças entre os três planos de contas da CVM e devolve
         liquidez, margens, endividamento e rentabilidade por setor.
 
@@ -233,6 +245,7 @@ if res is None:
         | Escala em MIL e em UNIDADE na mesma coluna | Tudo convertido para reais |
         | Dois exercícios por arquivo anual | Desduplicação com regra explícita |
         | Setores duplicados por holdings | 53 rótulos consolidados em ~29 setores |
+        | Semestre entrando como se fosse ano | Cada período é comparado só com ele mesmo |
 
         Comece pela barra lateral.
         """
@@ -245,11 +258,69 @@ if res.painel.empty:
     st.stop()
 
 # ----------------------------------------------------------------------------
+# Recorte do exercício
+#
+# O painel trabalha dentro de um período de cada vez. Comparar o 1º semestre com
+# o ano fechado seria comparar seis meses com doze, então a escolha filtra tudo
+# o que vem depois — inclusive a aba de evolução, que passa a comparar o mesmo
+# período entre anos.
+# ----------------------------------------------------------------------------
+periodos = res.periodos
+_n_por_periodo = (
+    res.painel.groupby("periodo")["cnpj"].nunique().to_dict()
+    if "periodo" in res.painel.columns else {}
+)
+
+
+def _rotulo_com_n(p: str) -> str:
+    """Rótulo do recorte com o tamanho da amostra colado.
+
+    Recortes fora do calendário civil — 4º trimestre, 2º semestre — só existem
+    para as poucas companhias de exercício social deslocado. Sem o número ao
+    lado, quem seleciona um deles lê nove empresas como se fossem o mercado.
+    """
+    n = _n_por_periodo.get(p)
+    return f"{rotulo_periodo(p)} ({n} cia.)" if n else rotulo_periodo(p)
+
+
+if len(periodos) > 1:
+    with st.sidebar:
+        st.divider()
+        st.markdown('<div class="eyebrow">Recorte</div>', unsafe_allow_html=True)
+        periodo = st.radio(
+            "Período comparado",
+            periodos,
+            format_func=_rotulo_com_n,
+            help="A DFP traz o exercício fechado; o ITR traz o acumulado do ano "
+                 "até o trimestre e o trimestre isolado. Cada recorte é comparado "
+                 "só com ele mesmo, em outros anos. O 4º trimestre e o 2º semestre "
+                 "só reúnem companhias de exercício social deslocado, que fecham "
+                 "em março ou junho — amostra pequena, não o mercado.",
+        )
+else:
+    periodo = periodos[0]
+
+
+def _do_periodo(tabela: pd.DataFrame) -> pd.DataFrame:
+    if tabela.empty or "periodo" not in tabela.columns:
+        return tabela
+    return tabela[tabela["periodo"] == periodo]
+
+
+painel = _do_periodo(res.painel)
+indicadores = _do_periodo(res.indicadores)
+setorial_fin = _do_periodo(res.setorial_financeira)
+
+if painel.empty:
+    st.error(f"Sem observações no recorte {rotulo_periodo(periodo)}.")
+    st.stop()
+
+# ----------------------------------------------------------------------------
 # Cabeçalho
 # ----------------------------------------------------------------------------
-anos = res.anos
-n_emp = res.painel["cnpj"].nunique()
-n_fin = res.painel.loc[res.painel["familia"] == "financeira", "cnpj"].nunique()
+anos = sorted(painel["ano"].unique().tolist())
+n_emp = painel["cnpj"].nunique()
+n_fin = painel.loc[painel["familia"] == "financeira", "cnpj"].nunique()
 
 st.markdown('<div class="eyebrow">CVM · Demonstrações Financeiras Padronizadas</div>',
             unsafe_allow_html=True)
@@ -258,15 +329,38 @@ st.title("Indicadores setoriais de companhias abertas")
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Companhias", f"{n_emp:,}".replace(",", "."))
 c2.metric("Exercícios", f"{min(anos)}–{max(anos)}" if len(anos) > 1 else str(anos[0]))
-c3.metric("Setores", res.painel["setor"].nunique())
-c4.metric("Financeiras (à parte)", n_fin)
+c3.metric("Setores", painel["setor"].nunique())
+if len(periodos) > 1:
+    c4.metric("Recorte", rotulo_periodo(periodo))
+else:
+    c4.metric("Financeiras (à parte)", n_fin)
+
+if periodo in ("4T", "2S"):
+    st.error(
+        f"**{rotulo_periodo(periodo)}: amostra de "
+        f"{_n_por_periodo.get(periodo, 0)} companhias.** A CVM não publica este "
+        "recorte. Ele existe aqui apenas para as companhias de exercício social "
+        "deslocado — usinas de açúcar e álcool, sobretudo — cujo trimestre "
+        "outubro–dezembro coincide com o trimestre civil. Não leia como setor.",
+        icon="🔍",
+    )
+
+if periodo != "ano":
+    st.warning(
+        f"Recorte **{rotulo_periodo(periodo)}**. Indicadores que dividem um fluxo "
+        "por um saldo — ROE, ROA, ROIC, giro do ativo, dívida líquida/EBITDA — "
+        "ficam na escala do próprio período e **não estão anualizados**: o ROE de "
+        "um trimestre não é comparável ao de um ano fechado. Margens e índices de "
+        "liquidez, que dividem duas grandezas do mesmo período, são comparáveis.",
+        icon="⚠️",
+    )
 
 abas = st.tabs([
     "Panorama setorial", "Evolução", "Empresa",
     "Financeiras", "Qualidade dos dados", "Exportar",
 ])
 
-setorial = res.setorial_nao_financeira
+setorial = _do_periodo(res.setorial_nao_financeira)
 
 # ----------------------------------------------------------------------------
 # 1. Panorama setorial
@@ -323,7 +417,7 @@ with abas[0]:
 
             st.markdown("#### Empresas do setor")
             setor_alvo = st.selectbox("Setor", sorted(dados["setor"].unique()))
-            rk = ranking_empresas(res.indicadores, chave, ano, setor_alvo)
+            rk = ranking_empresas(res.indicadores, chave, ano, setor_alvo, periodo)
             rk["valor"] = rk["valor"].map(lambda v: formatar_valor(v, formato))
             st.dataframe(
                 rk[["empresa", "valor"]].rename(columns={"empresa": "Companhia",
@@ -337,8 +431,10 @@ with abas[0]:
 with abas[1]:
     if len(anos) < 2:
         st.info(
-            "A evolução precisa de pelo menos dois exercícios. Carregue os arquivos "
-            "DFP de outros anos na barra lateral."
+            "A evolução precisa de pelo menos dois exercícios no recorte "
+            f"{rotulo_periodo(periodo)}. Carregue os arquivos de outros anos na "
+            "barra lateral — para comparar um trimestre ou um semestre entre anos, "
+            "é preciso o ITR de cada ano."
         )
     elif setorial.empty:
         st.info("Sem dados setoriais.")
@@ -366,7 +462,8 @@ with abas[1]:
                 alt.Chart(d)
                 .mark_line(point=alt.OverlayMarkDef(size=55), strokeWidth=2)
                 .encode(
-                    x=alt.X("ano:O", title="Exercício"),
+                    x=alt.X("ano:O",
+                            title=f"Exercício — {rotulo_periodo(periodo)}"),
                     y=alt.Y("mediana:Q", title=f"Mediana — {rotulo}"),
                     color=alt.Color("setor:N", title=None,
                                     legend=alt.Legend(orient="bottom", columns=2)),
@@ -388,18 +485,18 @@ with abas[1]:
 # 3. Empresa
 # ----------------------------------------------------------------------------
 with abas[2]:
-    empresas = res.painel[["cnpj", "empresa", "setor"]].drop_duplicates("cnpj")
+    empresas = painel[["cnpj", "empresa", "setor"]].drop_duplicates("cnpj")
     empresas = empresas.sort_values("empresa")
     nome = st.selectbox("Companhia", empresas["empresa"].tolist())
     cnpj = empresas.loc[empresas["empresa"] == nome, "cnpj"].iloc[0]
-    linha = res.painel[res.painel["cnpj"] == cnpj].iloc[-1]
+    linha = painel[painel["cnpj"] == cnpj].iloc[-1]
 
     m1, m2, m3 = st.columns(3)
     m1.metric("Setor", linha["setor"])
     m2.metric("Plano de contas", linha["plano_rotulo"])
     m3.metric("CNPJ", cnpj)
 
-    comp = posicao_relativa(res.indicadores, cnpj)
+    comp = posicao_relativa(indicadores, cnpj)
     if comp.empty:
         st.info("Sem indicadores calculáveis para esta companhia.")
     else:
@@ -421,7 +518,7 @@ with abas[2]:
         )
 
     with st.expander("Conceitos contábeis extraídos"):
-        conceitos = res.painel[res.painel["cnpj"] == cnpj].set_index("ano")
+        conceitos = painel[painel["cnpj"] == cnpj].set_index("ano")
         numericas = conceitos.select_dtypes("number").drop(columns=["ano"], errors="ignore")
         st.dataframe((numericas.T / 1_000_000).round(2), use_container_width=True)
         st.caption("Valores em R$ milhões.")
@@ -436,7 +533,7 @@ with abas[3]:
         "Liquidez corrente e margem bruta simplesmente não existem nesse plano de "
         "contas; forçar o cálculo produziria número, não informação."
     )
-    fin = res.setorial_financeira
+    fin = setorial_fin
     if fin.empty:
         st.info("Nenhuma companhia financeira nas bases carregadas.")
     else:
@@ -447,10 +544,10 @@ with abas[3]:
                              key="fin_ano")
         chave = opcoes.loc[opcoes["rotulo"] == rotulo, "indicador"].iloc[0]
 
-        emp = res.indicadores[
-            (res.indicadores["familia"] == "financeira")
-            & (res.indicadores["indicador"] == chave)
-            & (res.indicadores["ano"] == ano_f)
+        emp = indicadores[
+            (indicadores["familia"] == "financeira")
+            & (indicadores["indicador"] == chave)
+            & (indicadores["ano"] == ano_f)
         ].copy()
         if emp.empty:
             st.info("Sem observações para este recorte.")
@@ -488,15 +585,22 @@ with abas[4]:
 
     st.markdown("#### Cobertura por indicador")
     st.caption(
-        "Cobertura baixa não significa erro: quer dizer que muitas companhias não "
-        "têm o conceito necessário na base carregada. EBITDA e derivados dependem "
-        "da DFC, cujo método indireto vem em arquivo separado."
+        "Leia como funil, da esquerda para a direita: das observações aplicáveis "
+        "à família do indicador saem primeiro as que não têm um conceito exigido "
+        "pela fórmula, depois as barradas por denominador residual e por limite de "
+        "plausibilidade. Cobertura baixa não significa erro. A coluna \"Sem conceito "
+        "exigido\" é a que mais pesa em EBITDA e derivados: eles dependem da DFC, "
+        "cujo método indireto vem em arquivo separado. "
+        f"Os números abaixo são do recorte {rotulo_periodo(periodo)}."
     )
-    diag = res.diagnostico.copy()
+    diag = _do_periodo(res.diagnostico).copy()
     diag["cobertura"] = (diag["cobertura"] * 100).round(1).astype(str) + "%"
+    diag = diag.drop(columns=["periodo"], errors="ignore")
     st.dataframe(
         diag.rename(columns={
             "rotulo": "Indicador", "empresas_aplicaveis": "Empresas aplicáveis",
+            "observacoes_aplicaveis": "Obs. aplicáveis",
+            "descartes_conceito_ausente": "Sem conceito exigido",
             "observacoes_com_dados": "Obs. com dados",
             "descartes_denominador": "Descartes (denominador)",
             "descartes_outlier": "Descartes (limite)",
@@ -532,6 +636,25 @@ with abas[4]:
                 "Presentes nas demonstrações, ausentes da base cadastral. Carregue "
                 "uma base cadastral mais recente para classificá-las."
             )
+
+    st.markdown("#### Classificação por período")
+    if res.descartes_periodo.empty:
+        st.success(
+            "Todas as linhas contábeis foram atribuídas a um período, sem descarte."
+        )
+    else:
+        st.caption(
+            "Linhas que a classificação de período tratou de forma especial. "
+            "Janela não reconhecida costuma ser companhia com exercício social "
+            "deslocado, que continua valendo no recorte anual mas fica fora dos "
+            "recortes trimestrais."
+        )
+        st.dataframe(
+            res.descartes_periodo.rename(
+                columns={"motivo": "Situação", "linhas": "Linhas"}
+            ),
+            use_container_width=True, hide_index=True,
+        )
 
     st.markdown("#### Reapresentações detectadas")
     if res.conflitos.empty:

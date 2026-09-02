@@ -27,7 +27,7 @@ app.py            interface Streamlit (6 abas)
 gerar_snapshot.py script que congela o resultado para publicação
 core/             motor, usável como biblioteca independente da UI
   ingestao        detecta tipo de arquivo, resolve encoding, abre ZIPs
-  normalizacao    versão, escala monetária, exercícios, setores
+  normalizacao    versão, escala monetária, exercícios, período, setores
   conceitos       plano de contas → conceitos canônicos
   indicadores     motor de fórmulas
   agregacao       estatísticas setoriais
@@ -75,6 +75,15 @@ indicador; o relatório das financeiras tem aba própria.
 **Mediana, não média,** para o corte setorial; o agregado do setor entra como
 leitura ponderada, ao lado, não no lugar.
 
+**Cada observação vive num período.** A chave é `(cnpj, ano, periodo)`, nunca
+`(cnpj, ano)`. `periodo` vale `ano` (DFP), `1T`, `1S`, `9M` (acumulados do ITR) ou
+`2T`, `3T` (trimestres isolados) — só o que a CVM publica; 4T e 2S não existem
+porque exigiriam subtração. Recortes nunca se misturam numa mesma estatística, e
+a UI compara sempre o mesmo recorte entre anos. Em recorte parcial, indicadores
+de fluxo sobre saldo (ROE, ROA, giro) **não são anualizados** — o painel avisa.
+`MED()` acha o saldo de abertura pela data (fim do período anterior), não pela
+linha vizinha do painel.
+
 **O painel compartilhado lê snapshot, não CSV.** A ingestão é pesada demais para
 hospedagem grátis (~1 GB de memória) e exigiria que cada pessoa subisse os
 arquivos. Então `gerar_snapshot.py` roda o pipeline na máquina de quem publica e
@@ -91,7 +100,11 @@ disponíveis para recalcular. Nenhuma regra de negócio mora aí: é só persist
   contrário. Cache é responsabilidade do `app.py` (`@st.cache_data`).
 
 ## Dados
-- Fonte: https://dados.cvm.gov.br/dataset/cia_aberta-doc-dfp
+- Fonte anual (DFP): https://dados.cvm.gov.br/dataset/cia_aberta-doc-dfp
+- Fonte trimestral (ITR): https://dados.cvm.gov.br/dataset/cia_aberta-doc-itr
+- O ITR traz o mesmo período do ano anterior em `PENÚLTIMO`, mas só na DRE/DFC —
+  o balanço comparativo é o de 31/12. Para comparar trimestres entre anos, baixe
+  o ITR de cada ano.
 - Os CSVs/ZIPs ficam em `dados/` e estão no `.gitignore` — **não commitar**.
 - Arquivos `_ind_` (demonstrações individuais) são ignorados de propósito.
 - Sem o arquivo `DFC_MI`, a cobertura de EBITDA e derivados cai a quase zero.

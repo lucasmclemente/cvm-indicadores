@@ -13,6 +13,13 @@
 #
 # familias: quais tipos de empresa recebem o indicador. Liquidez corrente nao
 # existe para banco porque o balanco bancario nao segrega circulante.
+#
+# requer: conceitos sem os quais a observacao nao e calculavel. Serve ao
+# diagnostico: a observacao que perde um conceito exigido sai contada na coluna
+# "Sem conceito exigido" da aba Qualidade dos dados, em vez de se confundir com
+# a companhia que nao tem dado nenhum. Declare aqui os conceitos estimados por
+# heuristica (D&A, dividendos pagos) e os que dependem de um arquivo especifico
+# da CVM (FCO vem da DFC), porque sao os que costumam faltar em bloco.
 # =============================================================================
 
 indicadores:
@@ -242,6 +249,7 @@ indicadores:
     formato: moeda
     num: "fco"
     den: "1"
+    requer: [fco]
     agregacao_soma: true
     interpretacao: "Caixa liquido gerado pelas atividades operacionais no exercicio. Conta padronizada 6.01, antes de investimentos, dividas e dividendos."
 
@@ -252,6 +260,7 @@ indicadores:
     formato: moeda
     num: "fco + fci"
     den: "1"
+    requer: [fco, fci]
     agregacao_soma: true
     interpretacao: "Caixa da operacao depois dos investimentos, antes de divida e dividendos: o que sobra para remunerar credor e acionista. O FCI entra somado porque ja vem negativo na DFC. Fora do relatorio das financeiras, onde 'investimento' inclui compra de titulos e a medida perde sentido."
 
@@ -262,8 +271,9 @@ indicadores:
     formato: percentual
     num: "dividendos_pagos"
     den: "receita_liquida"
+    requer: [dividendos_pagos]
     den_positivo: true
-    interpretacao: "Dividendos e JCP efetivamente pagos no exercicio sobre a receita liquida. Sai da DFC como conta livre, entao e ESTIMADO: confira a cobertura na aba de qualidade. Holdings passam de 100% porque distribuem o que recebem de controladas, nao o que faturam."
+    interpretacao: "Dividendos e JCP efetivamente pagos no exercicio sobre a receita liquida. Sai da DFC como conta livre, entao e ESTIMADO: confira a cobertura na aba de qualidade. Companhia sem nenhuma linha reconhecida entra em 'Sem conceito exigido' - o que inclui tanto quem nao distribuiu nada quanto quem descreveu a conta de um jeito que a heuristica nao pegou; o painel nao distingue os dois casos. Holdings passam de 100% porque distribuem o que recebem de controladas, nao o que faturam."
 
 # --- Regras de saneamento aplicadas antes da agregacao setorial ---------------
 # Sem isso, uma empresa com PL de R$ 1 mil e lucro de R$ 50 milhoes produz um
