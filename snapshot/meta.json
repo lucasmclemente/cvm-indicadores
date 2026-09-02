@@ -1,6 +1,6 @@
 {
-  "gerado_em": "2026-08-25T17:04:31-03:00",
-  "rotulo": "DFP consolidada, exercicios 2015-2025 (CVM)",
+  "gerado_em": "2026-09-02T09:41:03-03:00",
+  "rotulo": "DFP 2015-2025 + ITR 2021-2026 (CVM)",
   "tabelas": [
     "painel",
     "indicadores",
@@ -10,7 +10,8 @@
     "cadastro",
     "conflitos",
     "diagnostico",
-    "log_ingestao"
+    "log_ingestao",
+    "descartes_periodo"
   ],
   "anos": [
     2015,
@@ -23,8 +24,19 @@
     2022,
     2023,
     2024,
-    2025
+    2025,
+    2026
   ],
-  "companhias": 607,
+  "periodos": [
+    "ano",
+    "1T",
+    "1S",
+    "9M",
+    "2T",
+    "3T",
+    "4T",
+    "2S"
+  ],
+  "companhias": 609,
   "setores": 30
 }
