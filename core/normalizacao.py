@@ -38,9 +38,19 @@ PERIODOS: dict[str, dict] = {
     "9M": {"rotulo": "9 meses",       "meses": 9,  "ordem": 3, "recortes": ["acumulado"]},
     "2T": {"rotulo": "2º trimestre",  "meses": 3,  "ordem": 4, "recortes": ["trimestre"]},
     "3T": {"rotulo": "3º trimestre",  "meses": 3,  "ordem": 5, "recortes": ["trimestre"]},
-    "4T": {"rotulo": "4º trimestre",  "meses": 3,  "ordem": 6, "recortes": ["trimestre"]},
-    "2S": {"rotulo": "2º semestre",   "meses": 6,  "ordem": 7, "recortes": ["acumulado"]},
+    "4T": {"rotulo": "4º trimestre",  "meses": 3,  "ordem": 6, "recortes": ["trimestre"],
+           "oculto": True},
+    "2S": {"rotulo": "2º semestre",   "meses": 6,  "ordem": 7, "recortes": ["acumulado"],
+           "oculto": True},
 }
+
+# `oculto` nao apaga o dado: a observacao continua no painel e na planilha
+# exportada. Ela apenas nao e oferecida como recorte comparavel, porque 4T e 2S
+# nascem de efeito colateral do calendario. A CVM nao publica o 4o trimestre nem
+# o 2o semestre; os dois so aparecem para a duzia de companhias de exercicio
+# social deslocado - usinas de acucar, sobretudo - cujo trimestre
+# outubro-dezembro por acaso coincide com o trimestre civil. Como corte setorial
+# seriam uma amostra de 18 e 5 companhias lida como se fosse o mercado.
 
 # Janela de datas -> periodo. A tolerancia existe porque exercicio social nao
 # comeca sempre no dia primeiro e ano bissexto muda a contagem.
@@ -70,6 +80,17 @@ def rotulo_periodo(periodo: str) -> str:
 def ordenar_periodos(periodos) -> list[str]:
     """Ordena periodos do mais longo para o mais curto, como na tabela acima."""
     return sorted(periodos, key=lambda p: PERIODOS.get(p, {}).get("ordem", 99))
+
+
+def periodos_visiveis(periodos) -> list[str]:
+    """Os recortes que valem como comparacao setorial, ja ordenados.
+
+    Se sobrar nenhum - carga que so tenha 4T, por exemplo - devolve o que veio,
+    porque um painel vazio esconderia mais do que informa.
+    """
+    ordenados = ordenar_periodos(periodos)
+    visiveis = [p for p in ordenados if not PERIODOS.get(p, {}).get("oculto")]
+    return visiveis or ordenados
 
 
 def _classificar_janela(duracao: pd.Series, mes_inicio: pd.Series) -> pd.Series:
