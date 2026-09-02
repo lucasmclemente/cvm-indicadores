@@ -45,6 +45,7 @@ def salvar(res, diretorio: str = DIR_PADRAO, rotulo: str = "") -> dict:
         "rotulo": rotulo,
         "tabelas": tabelas,
         "anos": res.anos,
+        "periodos": res.periodos,
         "companhias": (
             int(res.painel["cnpj"].nunique()) if not res.painel.empty else 0
         ),
@@ -77,7 +78,12 @@ def assinatura(diretorio: str = DIR_PADRAO) -> float:
 
 
 def carregar(diretorio: str = DIR_PADRAO):
-    """Reconstroi um Resultado a partir dos Parquet gravados por salvar()."""
+    """Reconstroi um Resultado a partir dos Parquet gravados por salvar().
+
+    Snapshot gravado antes de existirem periodos nao tem a coluna: naquela
+    epoca todo o painel era exercicio fechado, entao ela e reposta com "ano".
+    Isso mantem um painel publicado antigo funcionando sem regerar nada.
+    """
     from . import Resultado  # tardio: Resultado vive no __init__ do pacote
 
     dados = {}
@@ -86,4 +92,9 @@ def carregar(diretorio: str = DIR_PADRAO):
         dados[campo.name] = (
             pd.read_parquet(caminho) if os.path.isfile(caminho) else pd.DataFrame()
         )
+    for nome in ["painel", "indicadores", "setorial_nao_financeira",
+                 "setorial_financeira", "diagnostico"]:
+        tabela = dados.get(nome)
+        if tabela is not None and not tabela.empty and "periodo" not in tabela.columns:
+            tabela["periodo"] = "ano"
     return Resultado(**dados)

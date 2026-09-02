@@ -36,12 +36,20 @@ class Resultado:
     conflitos: pd.DataFrame
     diagnostico: pd.DataFrame
     log_ingestao: pd.DataFrame
+    descartes_periodo: pd.DataFrame
 
     @property
     def anos(self) -> list[int]:
         if self.painel.empty:
             return []
         return sorted(self.painel["ano"].unique().tolist())
+
+    @property
+    def periodos(self) -> list[str]:
+        """Periodos presentes no painel, do mais longo para o mais curto."""
+        if self.painel.empty or "periodo" not in self.painel.columns:
+            return ["ano"]
+        return normalizacao.ordenar_periodos(self.painel["periodo"].unique().tolist())
 
 
 def executar(
@@ -53,13 +61,15 @@ def executar(
     cfg = cfg or carregar_config()
 
     bruto = ingestao.ingerir(arquivos)
-    fatos, conflitos = normalizacao.normalizar_fatos(bruto.demonstracoes, prioridade)
+    fatos, conflitos, descartes = normalizacao.normalizar_fatos(
+        bruto.demonstracoes, prioridade
+    )
     cadastro = normalizacao.normalizar_cadastro(bruto.cadastro, cfg["setores"])
 
     if fatos.empty:
         vazio = pd.DataFrame()
         return Resultado(vazio, vazio, vazio, vazio, vazio, cadastro, conflitos,
-                         vazio, bruto.resumo_log)
+                         vazio, bruto.resumo_log, descartes)
 
     planos = conceitos.detectar_plano(fatos, cfg["conceitos"])
     painel = conceitos.montar_painel(fatos, planos, cadastro, cfg["conceitos"])
@@ -74,11 +84,12 @@ def executar(
         setorial_financeira=agregacao.agregar_por_setor(
             ind, cfg["indicadores"], "financeira"
         ),
-        planos=planos,
+        planos=conceitos.plano_por_empresa(planos),
         cadastro=cadastro,
         conflitos=conflitos,
         diagnostico=diag,
         log_ingestao=bruto.resumo_log,
+        descartes_periodo=descartes,
     )
 
 

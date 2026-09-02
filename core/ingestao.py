@@ -35,6 +35,11 @@ PADROES_ARQUIVO: list[tuple[str, str]] = [
 # consolidada da mesma companhia duplicaria a empresa no calculo setorial.
 PADRAO_INDIVIDUAL = re.compile(r"_ind_", re.IGNORECASE)
 
+# De que documento a linha veio. Importa porque os dois pacotes se sobrepoem:
+# o ITR carrega algumas janelas anuais, e a mesma conta pode chegar com CD_CONTA
+# diferente em cada um. Quem separa as duas fontes e core.normalizacao.
+PADRAO_ITR = re.compile(r"itr_cia_aberta", re.IGNORECASE)
+
 COLUNAS_DF = [
     "CNPJ_CIA", "DT_REFER", "VERSAO", "DENOM_CIA", "CD_CVM", "GRUPO_DFP",
     "MOEDA", "ESCALA_MOEDA", "ORDEM_EXERC", "DT_FIM_EXERC",
@@ -55,6 +60,11 @@ class ResultadoIngestao:
     @property
     def resumo_log(self) -> pd.DataFrame:
         return pd.DataFrame(self.log)
+
+
+def origem_arquivo(nome: str) -> str:
+    """ITR (trimestral) ou DFP (anual), pelo nome do arquivo."""
+    return "ITR" if PADRAO_ITR.search(nome) else "DFP"
 
 
 def classificar_arquivo(nome: str) -> str | None:
@@ -92,7 +102,9 @@ def _ler_csv(buffer: bytes) -> pd.DataFrame:
     raise ValueError(f"Nao foi possivel ler o arquivo: {ultimo_erro}")
 
 
-def _normalizar_colunas(df: pd.DataFrame, demonstracao: str) -> pd.DataFrame:
+def _normalizar_colunas(
+    df: pd.DataFrame, demonstracao: str, origem: str = "DFP"
+) -> pd.DataFrame:
     """Garante o conjunto de colunas esperado mesmo em layouts antigos.
 
     O BPA/BPP nao trazem DT_INI_EXERC, e arquivos de anos anteriores ja
@@ -106,7 +118,8 @@ def _normalizar_colunas(df: pd.DataFrame, demonstracao: str) -> pd.DataFrame:
     if "DT_INI_EXERC" not in df.columns:
         df["DT_INI_EXERC"] = pd.NA
     df["DEMONSTRACAO"] = demonstracao
-    return df[COLUNAS_DF + ["DT_INI_EXERC", "DEMONSTRACAO"]]
+    df["ORIGEM"] = origem
+    return df[COLUNAS_DF + ["DT_INI_EXERC", "DEMONSTRACAO", "ORIGEM"]]
 
 
 def ingerir(arquivos: list[tuple[str, bytes]]) -> ResultadoIngestao:
@@ -125,11 +138,23 @@ def ingerir(arquivos: list[tuple[str, bytes]]) -> ResultadoIngestao:
 
         if nome.lower().endswith(".zip"):
             try:
+                membros = []
                 with zipfile.ZipFile(io.BytesIO(conteudo)) as zf:
-                    membros = [
-                        (m, zf.read(m)) for m in zf.namelist()
-                        if m.lower().endswith(".csv")
-                    ]
+                    for m in zf.namelist():
+                        if not m.lower().endswith(".csv"):
+                            continue
+                        # Classifica pelo nome ANTES de descomprimir. O pacote
+                        # anual da CVM traz DMPL, DRA, parecer e as versoes
+                        # individuais, que somam centenas de MB e seriam
+                        # descartadas logo adiante: le-los custaria memoria que
+                        # o resto do pipeline precisa.
+                        if classificar_arquivo(m) is None:
+                            resultado.log.append(
+                                {"arquivo": m, "tipo": "-", "linhas": 0,
+                                 "status": "ignorado (nao reconhecido ou DF individual)"}
+                            )
+                            continue
+                        membros.append((m, zf.read(m)))
                 fila.extend(membros)
                 resultado.log.append(
                     {"arquivo": nome, "tipo": "ZIP", "linhas": len(membros),
@@ -166,7 +191,7 @@ def ingerir(arquivos: list[tuple[str, bytes]]) -> ResultadoIngestao:
             )
             continue
 
-        df = _normalizar_colunas(df, tipo)
+        df = _normalizar_colunas(df, tipo, origem_arquivo(nome))
         blocos.setdefault(tipo, []).append(df)
         resultado.log.append(
             {"arquivo": nome, "tipo": tipo, "linhas": len(df), "status": "ok"}

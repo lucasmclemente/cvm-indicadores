@@ -4,6 +4,12 @@ Roda o pipeline completo sobre uma pasta local e grava o resultado em
 ./snapshot como Parquet. E esse snapshot - pequeno o bastante para caber no
 repositorio - que o painel compartilhado carrega.
 
+A pasta pode conter os arquivos anuais (DFP) e os trimestrais (ITR) juntos:
+cada periodo vira um recorte proprio no painel, e nenhum deles se mistura com
+outro. Para comparar um trimestre ou um semestre entre anos, e preciso o ITR de
+cada ano - o ITR de 2026 traz o mesmo periodo de 2025 na coluna PENULTIMO, mas
+so para as contas de resultado, nao para o balanco.
+
 Uso tipico:
 
     python gerar_snapshot.py
@@ -47,7 +53,10 @@ def main() -> int:
     ]
     if not brutos:
         print(f"ERRO: nenhum .csv ou .zip em {args.pasta}", file=sys.stderr)
-        print("Baixe as bases em https://dados.cvm.gov.br/dataset/cia_aberta-doc-dfp",
+        print("Baixe as bases em:", file=sys.stderr)
+        print("  anual      https://dados.cvm.gov.br/dataset/cia_aberta-doc-dfp",
+              file=sys.stderr)
+        print("  trimestral https://dados.cvm.gov.br/dataset/cia_aberta-doc-itr",
               file=sys.stderr)
         return 1
 
@@ -69,6 +78,7 @@ def main() -> int:
     print()
     print(f"Snapshot gravado em {args.saida}")
     print(f"  exercicios : {min(meta['anos'])}-{max(meta['anos'])}")
+    print(f"  recortes   : {', '.join(meta['periodos'])}")
     print(f"  companhias : {meta['companhias']}")
     print(f"  setores    : {meta['setores']}")
     print(f"  tamanho    : {peso / 1_048_576:.1f} MB")
