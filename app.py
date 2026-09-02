@@ -148,11 +148,25 @@ def _grafico_faixa(dados: pd.DataFrame, formato: str, rotulo: str) -> alt.Chart:
 
 
 def _exportar_excel(res: core.Resultado) -> bytes:
+    """Monta a planilha das tabelas agregadas, com todos os recortes.
+
+    Duas decisoes de engenharia, ambas por causa do tamanho:
+
+    O engine e xlsxwriter em `constant_memory`, que escreve linha a linha. O
+    openpyxl guarda a pasta inteira na memoria como objetos Python e pedia mais
+    de 2 GB - o bastante para derrubar a hospedagem gratuita.
+
+    Os indicadores por empresa ficam de fora: sao 359 mil linhas, 136 dos 163
+    segundos de montagem, e ninguem le esse volume numa planilha. Eles saem em
+    CSV, no recorte selecionado, que o Excel abre igual.
+    """
     buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+    with pd.ExcelWriter(
+        buffer, engine="xlsxwriter",
+        engine_kwargs={"options": {"constant_memory": True}},
+    ) as writer:
         res.setorial_nao_financeira.to_excel(writer, sheet_name="Setorial não-financeiras", index=False)
         res.setorial_financeira.to_excel(writer, sheet_name="Setorial financeiras", index=False)
-        res.indicadores.to_excel(writer, sheet_name="Indicadores por empresa", index=False)
         res.painel.to_excel(writer, sheet_name="Painel de conceitos", index=False)
         res.diagnostico.to_excel(writer, sheet_name="Cobertura", index=False)
         if not res.descartes_periodo.empty:
@@ -720,24 +734,49 @@ with abas[4]:
 # ----------------------------------------------------------------------------
 with abas[5]:
     st.markdown(
-        "Todas as tabelas do painel, mais os artefatos de auditoria, em um arquivo."
+        "As tabelas setoriais, o painel de conceitos e os artefatos de auditoria "
+        "em um arquivo, com **todos os recortes** — a coluna `periodo` distingue "
+        "o exercício fechado dos trimestres e semestres. Os indicadores por "
+        "empresa saem em CSV, logo abaixo: são 359 mil linhas, que uma planilha "
+        "carrega mal e ninguém lê inteiras."
     )
-    st.download_button(
-        "Baixar planilha completa",
-        data=_exportar_excel(res),
-        file_name=f"indicadores_setoriais_{min(anos)}_{max(anos)}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        type="primary",
-    )
+    # A planilha e montada so quando alguem pede. `st.download_button` exige os
+    # bytes prontos, e o Streamlit executa o corpo de todas as abas a cada
+    # clique em qualquer widget: gerar aqui dentro custaria um minuto e meio de
+    # espera por interacao, para um arquivo que quase ninguem baixa.
+    if st.button("Preparar planilha", type="primary"):
+        with st.spinner("Montando a planilha — leva cerca de um minuto…"):
+            st.session_state["planilha"] = _exportar_excel(res)
+            st.session_state["planilha_nome"] = (
+                f"indicadores_setoriais_{min(anos)}_{max(anos)}.xlsx"
+            )
+
+    if st.session_state.get("planilha"):
+        st.download_button(
+            "Baixar planilha completa",
+            data=st.session_state["planilha"],
+            file_name=st.session_state["planilha_nome"],
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        st.caption(
+            f"{len(st.session_state['planilha']) / 1_048_576:.1f} MB · "
+            "todos os recortes."
+        )
     st.divider()
+    st.caption(
+        f"Os CSV abaixo seguem o recorte selecionado — {rotulo_periodo(periodo)}. "
+        "Para todos os recortes de uma vez, use a planilha acima."
+    )
     col1, col2 = st.columns(2)
     col1.download_button(
         "Setorial não-financeiras (CSV)",
-        res.setorial_nao_financeira.to_csv(index=False).encode("utf-8-sig"),
-        "setorial_nao_financeiras.csv", "text/csv", use_container_width=True,
+        setorial.to_csv(index=False).encode("utf-8-sig"),
+        f"setorial_nao_financeiras_{periodo}.csv", "text/csv",
+        use_container_width=True,
     )
     col2.download_button(
         "Indicadores por empresa (CSV)",
-        res.indicadores.to_csv(index=False).encode("utf-8-sig"),
-        "indicadores_empresa.csv", "text/csv", use_container_width=True,
+        indicadores.to_csv(index=False).encode("utf-8-sig"),
+        f"indicadores_empresa_{periodo}.csv", "text/csv",
+        use_container_width=True,
     )
