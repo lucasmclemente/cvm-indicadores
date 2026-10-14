@@ -382,6 +382,51 @@ anos = sorted(painel["ano"].unique().tolist())
 n_emp = painel["cnpj"].nunique()
 n_fin = painel.loc[painel["familia"] == "financeira", "cnpj"].nunique()
 
+# Quantas companhias cada exercício reúne neste recorte. O exercício corrente
+# costuma estar incompleto: no recorte anual, 2026 tem as sete companhias de
+# exercício social deslocado que já fecharam o ano, contra 440 em 2025.
+EMPRESAS_POR_ANO = painel.groupby("ano")["cnpj"].nunique().to_dict()
+FRACAO_ANO_CHEIO = 0.5
+
+
+def _ano_padrao(disponiveis: list[int]) -> int:
+    """O exercício mais recente que já representa o mercado.
+
+    Abrir no ano mais recente é o reflexo certo quase sempre, e era o que o
+    painel fazia enquanto só existia DFP: o último ano era sempre um ano
+    fechado. Com o ITR o painel passou a alcançar o exercício corrente, e o ano
+    mais recente virou uma amostra de sete empresas — quem abre o link cai num
+    gráfico de um setor só e conclui que o painel está quebrado.
+
+    A regra não fixa ano nenhum: pega o mais recente que tenha ao menos metade
+    das companhias do melhor exercício do recorte. Os anos magros continuam
+    selecionáveis, com aviso.
+    """
+    if not disponiveis:
+        return None
+    teto = max(EMPRESAS_POR_ANO.get(a, 0) for a in disponiveis)
+    cheios = [
+        a for a in disponiveis
+        if EMPRESAS_POR_ANO.get(a, 0) >= teto * FRACAO_ANO_CHEIO
+    ]
+    return max(cheios) if cheios else max(disponiveis)
+
+
+def _aviso_ano_magro(ano_escolhido: int) -> None:
+    """Explica um exercício com poucas companhias, em vez de deixar o gráfico
+    vazio falar por si."""
+    n = EMPRESAS_POR_ANO.get(ano_escolhido, 0)
+    teto = max(EMPRESAS_POR_ANO.values()) if EMPRESAS_POR_ANO else 0
+    if teto and n < teto * FRACAO_ANO_CHEIO:
+        st.info(
+            f"**{ano_escolhido} ainda está em aberto neste recorte: {n} "
+            f"companhia(s)**, contra {teto} no exercício mais cheio. Só entram "
+            "as que já encerraram o período — no recorte anual, as de exercício "
+            "social deslocado, que fecham em fevereiro ou março. A leitura "
+            "setorial fica frágil.",
+            icon="📅",
+        )
+
 st.markdown('<div class="eyebrow">CVM · Demonstrações Financeiras Padronizadas</div>',
             unsafe_allow_html=True)
 st.title("Indicadores setoriais de companhias abertas")
@@ -437,7 +482,11 @@ with abas[0]:
         grupo = e1.selectbox("Grupo", sorted(opcoes["grupo"].unique()))
         sub = opcoes[opcoes["grupo"] == grupo]
         rotulo = e2.selectbox("Indicador", sub["rotulo"].tolist())
-        ano = e3.selectbox("Exercício", sorted(setorial["ano"].unique(), reverse=True))
+        anos_disp = sorted(setorial["ano"].unique().tolist(), reverse=True)
+        padrao = _ano_padrao(anos_disp)
+        ano = e3.selectbox("Exercício", anos_disp,
+                           index=anos_disp.index(padrao) if padrao in anos_disp else 0)
+        _aviso_ano_magro(ano)
 
         chave = sub.loc[sub["rotulo"] == rotulo, "indicador"].iloc[0]
         dados = setorial[(setorial["indicador"] == chave) & (setorial["ano"] == ano)]
@@ -560,8 +609,12 @@ with abas[2]:
     if comp.empty:
         st.info("Sem indicadores calculáveis para esta companhia.")
     else:
-        ano_emp = st.selectbox("Exercício", sorted(comp["ano"].unique(), reverse=True),
-                               key="emp_ano")
+        anos_emp = sorted(comp["ano"].unique().tolist(), reverse=True)
+        padrao_emp = _ano_padrao(anos_emp)
+        ano_emp = st.selectbox(
+            "Exercício", anos_emp, key="emp_ano",
+            index=anos_emp.index(padrao_emp) if padrao_emp in anos_emp else 0,
+        )
         c = comp[comp["ano"] == ano_emp].copy()
         c["Empresa"] = [formatar_valor(v, f) for v, f in zip(c["valor"], c["formato"])]
         c["Mediana do setor"] = [
@@ -600,8 +653,13 @@ with abas[3]:
         f1, f2 = st.columns(2)
         opcoes = fin[["indicador", "rotulo"]].drop_duplicates().sort_values("rotulo")
         rotulo = f1.selectbox("Indicador", opcoes["rotulo"].tolist(), key="fin_ind")
-        ano_f = f2.selectbox("Exercício", sorted(fin["ano"].unique(), reverse=True),
-                             key="fin_ano")
+        anos_fin = sorted(fin["ano"].unique().tolist(), reverse=True)
+        padrao_fin = _ano_padrao(anos_fin)
+        ano_f = f2.selectbox(
+            "Exercício", anos_fin, key="fin_ano",
+            index=anos_fin.index(padrao_fin) if padrao_fin in anos_fin else 0,
+        )
+        _aviso_ano_magro(ano_f)
         chave = opcoes.loc[opcoes["rotulo"] == rotulo, "indicador"].iloc[0]
 
         emp = indicadores[
